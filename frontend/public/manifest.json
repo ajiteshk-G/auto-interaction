@@ -1,0 +1,22 @@
+{
+  "name": "Mahindra Sales Mobile",
+  "short_name": "Sales Mobile",
+  "description": "Mahindra Sales Advisor Companion & Test Ride Recording Platform",
+  "start_url": "/sales-mobile",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "/avatars/jay.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/avatars/jay.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

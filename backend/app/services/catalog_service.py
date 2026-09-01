@@ -1,0 +1,441 @@
+from typing import List, Optional, Dict
+from app.schemas.catalog import VehicleItem, VehicleVariant, DealershipItem
+
+MAHINDRA_VEHICLES: List[VehicleItem] = [
+    VehicleItem(
+        id="thar_roxx",
+        name="Mahindra Thar ROXX (5-Door)",
+        tagline="The SUV That Rules Every Terrain with Refinement & Luxury",
+        category="Authentic SUV",
+        price_range="₹12.52 Lakh - ₹23.52 Lakh (Ex-Showroom)",
+        hero_image="/assets/thar-roxx.png",
+        engine_specs="2.0L mStallion Turbo Petrol (177 PS) & 2.2L mHawk Diesel (175 PS / 370 Nm)",
+        seating_capacity="5-Seater Extended Wheelbase",
+        fuel_or_battery="Diesel / Petrol (6-Speed MT / AT)",
+        range_or_mileage="15.2 km/l (Diesel AT ARAI)",
+        key_highlights=[
+            "Frequency Selective Damping (FSD) Suspension with Penta-Link Rear",
+            "Intelli-Turn Electronic Turning Radius Reducer",
+            "Level 2 ADAS (10+ Autonomous Features)",
+            "Panoramic Skyroof & Harmon Kardon 9-Speaker Audio",
+            "Dual 10.25-inch Digital Cockpit Screens"
+        ],
+        usp="Combines rugged 4x4 off-road heritage with plush city ride comfort and luxury cabin.",
+        variants=[
+            VehicleVariant(
+                name="AX7L Diesel AT 4x4",
+                price_ex_showroom="₹22.49 Lakh",
+                engine_or_battery="2.2L mHawk Diesel (175 PS)",
+                transmission="6-Speed Torque Converter AT",
+                key_features=["4XPLOR Terrain Modes", "FSD Suspension", "Level 2 ADAS", "Panoramic Skyroof", "Ventilated Front Seats"]
+            ),
+            VehicleVariant(
+                name="AX5L Diesel AT 4x2",
+                price_ex_showroom="₹18.99 Lakh",
+                engine_or_battery="2.2L mHawk Diesel (152 PS)",
+                transmission="6-Speed Torque Converter AT",
+                key_features=["Dual 10.25-inch Screens", "Wireless CarPlay", "Electronic Parking Brake"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="thar_3door",
+        name="Mahindra Thar (3-Door)",
+        tagline="The Iconic Pure Off-Roader for Adventure Enthusiasts",
+        category="Authentic SUV",
+        price_range="₹11.35 Lakh - ₹17.60 Lakh (Ex-Showroom)",
+        hero_image="/assets/thar.png",
+        engine_specs="2.0L mStallion Petrol (150 PS) & 2.2L mHawk Diesel (130 PS / 300 Nm)",
+        seating_capacity="4-Seater Hard Top & Convertible",
+        fuel_or_battery="Diesel / Petrol (4x4 & RWD)",
+        range_or_mileage="15.2 km/l",
+        key_highlights=[
+            "Shift-on-the-fly 4x4 with Low Range Transfer Case",
+            "Mechanical Locking Rear Differential (MLD)",
+            "650mm Water Wading Capability & Washable Interior Floor",
+            "Roll Cage Construction with 4-Star Global NCAP Safety"
+        ],
+        usp="Pure go-anywhere authentic off-road freedom with iconic classic stance.",
+        variants=[
+            VehicleVariant(
+                name="LX Hard Top Diesel 4x4 AT",
+                price_ex_showroom="₹17.60 Lakh",
+                engine_or_battery="2.2L mHawk Diesel (130 PS)",
+                transmission="6-Speed Automatic 4x4",
+                key_features=["4x4 Low Range", "MLD", "Touchscreen Audio", "18-inch Deep Silver Alloys"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="scorpio_n",
+        name="Mahindra Scorpio-N",
+        tagline="The Big Daddy of SUVs — Commanding Power & Presence",
+        category="Authentic SUV",
+        price_range="₹13.69 Lakh - ₹25.49 Lakh (Ex-Showroom)",
+        hero_image="/assets/scorpio-n.png",
+        engine_specs="2.0L mStallion Petrol (203 PS / 380 Nm) & 2.2L mHawk Diesel (175 PS / 400 Nm)",
+        seating_capacity="6 / 7-Seater Captain & Bench options",
+        fuel_or_battery="Diesel / Petrol (6-Speed MT / AT)",
+        range_or_mileage="14.5 km/l (ARAI)",
+        key_highlights=[
+            "4XPLOR Intelligent Terrain Management (Mud, Sand, Snow, Normal)",
+            "Watt's Linkage Rear Suspension for flat cornering",
+            "Sony 12-Speaker 3D Immersive Sound System",
+            "Dual-Zone Climate Control & Electric Sunroof",
+            "AdrenoX Connected Car Tech with 70+ Apps"
+        ],
+        usp="Unmatched commanding road presence, body-on-frame toughness, and punchy 400Nm torque.",
+        variants=[
+            VehicleVariant(
+                name="Z8L Diesel 4WD AT",
+                price_ex_showroom="₹24.54 Lakh",
+                engine_or_battery="2.2L mHawk Diesel (175 PS / 400 Nm)",
+                transmission="6-Speed Automatic",
+                key_features=["4XPLOR 4WD", "Sony 3D Sound", "Driver Drowsiness Alert", "Powered Driver Seat"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="scorpio_classic",
+        name="Mahindra Scorpio Classic",
+        tagline="The Undisputed Legend of Indian Roads",
+        category="Authentic SUV",
+        price_range="₹13.62 Lakh - ₹17.42 Lakh (Ex-Showroom)",
+        hero_image="/assets/scorpio-classic.png",
+        engine_specs="2.2L Gen-2 mHawk Diesel (132 PS / 300 Nm)",
+        seating_capacity="7 / 9-Seater Options",
+        fuel_or_battery="Diesel (6-Speed Cable Shift MT)",
+        range_or_mileage="15.0 km/l",
+        key_highlights=[
+            "All-Aluminum Gen-2 mHawk Diesel Engine",
+            "Classic Muscular Bonnet Scoop & Red Tower Tail Lamps",
+            "9-inch Touchscreen Infotainment with Phone Mirroring",
+            "Dual-Tone Plush Interiors with Wood Finish Accents"
+        ],
+        usp="Legendary rugged durability, low maintenance, and commanding high seating posture.",
+        variants=[
+            VehicleVariant(
+                name="S11 7-Seater",
+                price_ex_showroom="₹17.42 Lakh",
+                engine_or_battery="2.2L Gen-2 mHawk (132 PS)",
+                transmission="6-Speed MT",
+                key_features=["Projector Headlamps with DRLs", "17-inch Diamond Cut Alloys", "Auto AC"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="bolero",
+        name="Mahindra Bolero",
+        tagline="India's Most Trusted Workhorse & Rural Powerhouse",
+        category="Authentic SUV",
+        price_range="₹9.90 Lakh - ₹10.90 Lakh (Ex-Showroom)",
+        hero_image="/assets/bolero.png",
+        engine_specs="1.5L mHawk75 Diesel (75 PS / 210 Nm)",
+        seating_capacity="7-Seater Spacious Layout",
+        fuel_or_battery="Diesel (5-Speed Manual)",
+        range_or_mileage="16.0 km/l",
+        key_highlights=[
+            "Full Metal Body Construction for extreme resilience",
+            "Micro-Hybrid Technology for superior fuel economy",
+            "High Ground Clearance (180mm) with Heavy Duty Suspension",
+            "Proven Reliability across millions of rural & semi-urban miles"
+        ],
+        usp="Indestructible metal reliability, low cost of ownership, and exceptional resale value.",
+        variants=[
+            VehicleVariant(
+                name="B6 (Opt)",
+                price_ex_showroom="₹10.90 Lakh",
+                engine_or_battery="1.5L mHawk75 (75 PS)",
+                transmission="5-Speed Manual",
+                key_features=["Static Bending Headlamps", "Driver Airbag & ABS", "Remote Fuel Lid Opener"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="bolero_neo",
+        name="Mahindra Bolero Neo",
+        tagline="Toughness of Bolero, Style of Modern Urban SUV",
+        category="Authentic SUV",
+        price_range="₹9.95 Lakh - ₹12.15 Lakh (Ex-Showroom)",
+        hero_image="/assets/bolero-neo.png",
+        engine_specs="1.5L mHawk100 Diesel (100 PS / 260 Nm)",
+        seating_capacity="7-Seater Modern Cabin",
+        fuel_or_battery="Diesel (5-Speed Manual)",
+        range_or_mileage="17.2 km/l",
+        key_highlights=[
+            "Multi-Terrain Technology (MTT) Mechanical Locking Differential",
+            "Italian Design Center Cabin Styling by Pininfarina",
+            "7-inch Touchscreen Infotainment & Reverse Parking Camera",
+            "Cruise Control & ECO Drive Mode"
+        ],
+        usp="Modern authentic SUV toughness paired with Pininfarina styling and MLD traction.",
+        variants=[
+            VehicleVariant(
+                name="N10 (O) with MTT",
+                price_ex_showroom="₹12.15 Lakh",
+                engine_or_battery="1.5L mHawk100 (100 PS)",
+                transmission="5-Speed Manual",
+                key_features=["Mechanical Locking Differential", "Alloy Wheels", "Armrests on Front & Middle Row"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="xuv700",
+        name="Mahindra XUV700",
+        tagline="Rush of Technology, Power and Sophistication",
+        category="Tech SUV",
+        price_range="₹13.99 Lakh - ₹25.94 Lakh (Ex-Showroom)",
+        hero_image="/assets/xuv700.png",
+        engine_specs="2.0L mStallion Turbo Petrol (200 PS) & 2.2L mHawk Turbo Diesel (185 PS / 450 Nm)",
+        seating_capacity="5 / 7-Seater Luxury Cabin",
+        fuel_or_battery="Petrol / Diesel (MT / AT / AWD)",
+        range_or_mileage="15.8 km/l (ARAI)",
+        key_highlights=[
+            "Dual 10.25-inch Monolith HD Digital Screens",
+            "Level 2 ADAS with Adaptive Cruise & Auto Emergency Braking",
+            "Smart Door Handles & Memory Seat Access",
+            "Custom Drive Modes: Zip, Zap, Zoom & Custom",
+            "AWD Capability for High-Speed Highway Traction"
+        ],
+        usp="Segment-defining 200PS horsepower, high-speed stability, and benchmark safety scores.",
+        variants=[
+            VehicleVariant(
+                name="AX7L Diesel AWD AT",
+                price_ex_showroom="₹26.99 Lakh",
+                engine_or_battery="2.2L mHawk Diesel (185 PS / 450 Nm)",
+                transmission="6-Speed Automatic AWD",
+                key_features=["AWD", "Level 2 ADAS", "360 Surround View", "Blind View Monitor", "Wireless Charging"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="xuv_3xo",
+        name="Mahindra XUV 3XO",
+        tagline="Everything You Want & More in a Compact Tech SUV",
+        category="Tech SUV",
+        price_range="₹7.49 Lakh - ₹15.49 Lakh (Ex-Showroom)",
+        hero_image="/assets/xuv-3xo.png",
+        engine_specs="1.2L mStallion TGDi Turbo Petrol (130 PS / 230 Nm) & 1.5L Diesel (117 PS)",
+        seating_capacity="5-Seater Smart Cockpit",
+        fuel_or_battery="Petrol / Diesel (6-Speed MT / 6-Speed AISIN AT)",
+        range_or_mileage="20.1 km/l",
+        key_highlights=[
+            "First-in-Segment Panoramic Skyroof (Largest in Class)",
+            "Level 2 ADAS with 360-degree Surround Vision Camera",
+            "Dual 10.25-inch Screens with Wireless CarPlay / Android Auto",
+            "Harman Kardon Premium 7-Speaker Sound System"
+        ],
+        usp="Unmatched segment-first panoramic skyroof and Level 2 ADAS safety at an accessible price.",
+        variants=[
+            VehicleVariant(
+                name="AX7L TGDi Petrol AT",
+                price_ex_showroom="₹15.49 Lakh",
+                engine_or_battery="1.2L Turbo Petrol (130 PS)",
+                transmission="6-Speed AISIN AT",
+                key_features=["Panoramic Skyroof", "Level 2 ADAS", "Harman Kardon Sound", "Electronic Parking Brake"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="be_6e",
+        name="Mahindra BE 6e (Born Electric)",
+        tagline="Pure EV Architecture Built from Ground Up",
+        category="Born Electric SUV",
+        price_range="₹18.90 Lakh - ₹26.90 Lakh (Ex-Showroom)",
+        hero_image="/assets/be-6e.png",
+        engine_specs="Rear Permanent Magnet Synchronous Motor (285 PS / 380 Nm) on INGLO Platform",
+        seating_capacity="5-Seater Aero Coupe SUV",
+        fuel_or_battery="79 kWh LFP Blade Battery (175 kW DC Fast Charge)",
+        range_or_mileage="682 km (ARAI Certified Range)",
+        key_highlights=[
+            "INGLO Platform with Ultra-Low Center of Gravity",
+            "0-100 km/h in 6.7 seconds",
+            "175 kW Ultra-Fast Charging (20% to 80% in 20 minutes)",
+            "Augmented Reality Head-Up Display & Halo Light Bar",
+            "Semi-Active Intelligent Suspension with Pitch & Roll Control"
+        ],
+        usp="Longest real-world highway range in India with futuristic concept-car coupe aerodynamics.",
+        variants=[
+            VehicleVariant(
+                name="BE 6e Pack Three (79kWh)",
+                price_ex_showroom="₹26.90 Lakh",
+                engine_or_battery="285 PS Electric Motor / 79 kWh Battery",
+                transmission="Single-Speed e-Drive",
+                key_features=["682km Range", "AR-HUD", "Level 2+ ADAS", "16-Speaker Dolby Atmos", "175kW Charging"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="xev_9e",
+        name="Mahindra XEV 9e (Born Electric)",
+        tagline="India's First Executive Electric SUV Lounge",
+        category="Born Electric SUV",
+        price_range="₹21.90 Lakh - ₹29.90 Lakh (Ex-Showroom)",
+        hero_image="/assets/xev-9e.png",
+        engine_specs="Dual / Single Motor Setup up to 335 PS on INGLO Skate Platform",
+        seating_capacity="5-Seater Flagship Cinema Lounge",
+        fuel_or_battery="79 kWh Cell-to-Pack LFP Battery",
+        range_or_mileage="656 km (ARAI Certified Range)",
+        key_highlights=[
+            "Triple-Screen Panoramic Display (Driver, Center, Passenger Cinema)",
+            "Lounge Reclining Rear Seats with Executive Footrests",
+            "Active Noise Cancellation in Headrests",
+            "Vehicle-to-Load (V2L) and Vehicle-to-Vehicle (V2V) Power Share",
+            "Illuminated Glass Roof with Multi-Color Ambient Patterns"
+        ],
+        usp="Ultra-luxury passenger cinema lounge with uninterrupted coast-to-coast electric range.",
+        variants=[
+            VehicleVariant(
+                name="XEV 9e Pack Four Executive Lounge",
+                price_ex_showroom="₹29.90 Lakh",
+                engine_or_battery="335 PS Electric Powertrain / 79 kWh",
+                transmission="Single-Speed e-Drive",
+                key_features=["Triple 12.3-inch Dashboard", "Rear Passenger Cinema", "V2L Power Bank", "Air Suspension"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="xuv400_ev",
+        name="Mahindra XUV400 EV Pro",
+        tagline="Electrifying Performance with Everyday Practicality",
+        category="Born Electric SUV",
+        price_range="₹15.49 Lakh - ₹19.39 Lakh (Ex-Showroom)",
+        hero_image="/assets/xuv400-ev.png",
+        engine_specs="Electric Motor (150 PS / 310 Nm) with 39.4 kWh Battery",
+        seating_capacity="5-Seater Compact SUV",
+        fuel_or_battery="39.4 kWh Lithium-ion Battery",
+        range_or_mileage="456 km (MIDC Certified Range)",
+        key_highlights=[
+            "0-100 km/h in 8.3 seconds (Fastest in Segment)",
+            "Dual 10.25-inch Infotainment & Driver Cluster",
+            "Wireless Android Auto & Apple CarPlay",
+            "Dual-Zone Auto AC with Memory",
+            "50 kW DC Fast Charging"
+        ],
+        usp="Zippy city electric performance with spacious boot and proven safety.",
+        variants=[
+            VehicleVariant(
+                name="EL Pro 39.4 kWh FC",
+                price_ex_showroom="₹19.39 Lakh",
+                engine_or_battery="150 PS / 39.4 kWh Battery",
+                transmission="Single-Speed Automatic",
+                key_features=["456km Range", "7.2kW AC Fast Charger", "Sunroof", "Leatherette Seats"]
+            )
+        ]
+    ),
+    VehicleItem(
+        id="bolero_maxx",
+        name="Mahindra Bolero Maxx Pik-Up HD",
+        tagline="The Ultimate Commercial King of Payload & Profitability",
+        category="Commercial",
+        price_range="₹8.49 Lakh - ₹10.35 Lakh (Ex-Showroom)",
+        hero_image="/assets/bolero-camper.png",
+        engine_specs="2.5L m2Di Diesel (80 PS / 220 Nm)",
+        seating_capacity="3-Seater Driver & Co-Driver Cabin",
+        fuel_or_battery="Diesel (5-Speed Manual)",
+        range_or_mileage="17.2 km/l (ARAI)",
+        key_highlights=[
+            "2000 kg (2.0 Ton) Certified Heavy Duty Payload Capacity",
+            "iMAXX Telematics Connected Fleet Management & Geo-tracking",
+            "Height Adjustable Driver Seat & Digital Cluster",
+            "Heavy Duty 7R16 Tires with Rugged Rigid Axles"
+        ],
+        usp="Highest payload capacity in its class with iMAXX fleet telematics for maximum business ROI.",
+        variants=[
+            VehicleVariant(
+                name="HD 2.0L Diesel",
+                price_ex_showroom="₹10.35 Lakh",
+                engine_or_battery="2.5L m2Di Turbo (80 PS)",
+                transmission="5-Speed Manual",
+                key_features=["2-Ton Payload", "iMAXX Telematics", "Power Steering", "Rigid Suspension"]
+            )
+        ]
+    )
+]
+
+MAHINDRA_DEALERSHIPS: List[DealershipItem] = [
+    DealershipItem(
+        id="bayview_bandra",
+        name="Bayview Mahindra, Bandra West",
+        address="Plot 14, Linking Road, Near Bandra Police Station, Mumbai, MH 400050",
+        city="Mumbai",
+        phone="+91 22 2640 8899",
+        rating=4.9,
+        available_advisors=["Rajesh Varma (Senior SUV Specialist)", "Pooja Mehta (Born Electric Advisor)"],
+        has_test_drive_home_pickup=True
+    ),
+    DealershipItem(
+        id="infinity_andheri",
+        name="Infinity Mahindra, Andheri East",
+        address="Saki Vihar Road, Near Metro Station, Andheri East, Mumbai, MH 400072",
+        city="Mumbai",
+        phone="+91 22 4002 7700",
+        rating=4.8,
+        available_advisors=["Vikram Singh", "Sneha Nair"],
+        has_test_drive_home_pickup=True
+    ),
+    DealershipItem(
+        id="south_mumbai_worli",
+        name="Sterling Mahindra, Worli Sea Face",
+        address="Dr. Annie Besant Road, Worli, Mumbai, MH 400018",
+        city="Mumbai",
+        phone="+91 22 2493 5511",
+        rating=4.9,
+        available_advisors=["Amit Deshmukh", "Farhan Khan"],
+        has_test_drive_home_pickup=True
+    )
+]
+
+class CatalogService:
+    @staticmethod
+    def get_all_vehicles() -> List[VehicleItem]:
+        try:
+            from app.services.brand_service import BrandService
+            brand = BrandService.get_active_brand()
+            if brand and brand.vehicles:
+                return brand.vehicles
+        except Exception:
+            pass
+        return MAHINDRA_VEHICLES
+
+    @staticmethod
+    def get_vehicle_by_id(vehicle_id: str) -> Optional[VehicleItem]:
+        try:
+            from app.services.brand_service import BrandService
+            brand = BrandService.get_active_brand()
+            if brand and brand.vehicles:
+                for v in brand.vehicles:
+                    if v.id.lower() == vehicle_id.lower():
+                        return v
+        except Exception:
+            pass
+        for v in MAHINDRA_VEHICLES:
+            if v.id.lower() == vehicle_id.lower():
+                return v
+        return None
+
+    @staticmethod
+    def compare_vehicles(vehicle_ids: List[str]) -> List[VehicleItem]:
+        results = []
+        for vid in vehicle_ids:
+            item = CatalogService.get_vehicle_by_id(vid)
+            if item:
+                results.append(item)
+        return results
+
+    @staticmethod
+    def get_dealerships() -> List[DealershipItem]:
+        try:
+            from app.services.brand_service import BrandService
+            brand = BrandService.get_active_brand()
+            if brand and brand.dealerships:
+                return brand.dealerships
+        except Exception:
+            pass
+        return MAHINDRA_DEALERSHIPS
+
+    @staticmethod
+    def get_static_checklist(vehicle_id: Optional[str] = None) -> List[str]:
+        from app.services.checklist_service import ChecklistService
+        return ChecklistService.get_static_checklist(vehicle_id)
+

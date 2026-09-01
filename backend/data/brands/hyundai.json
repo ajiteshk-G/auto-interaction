@@ -1,0 +1,201 @@
+{
+  "id": "hyundai",
+  "name": "Hyundai Motor India",
+  "tagline": "New Thinking. New Possibilities \u2014 Smart Mobility for Tomorrow",
+  "logo_url": "https://www.hyundai.com/content/dam/hyundai/ww/en/images/common/logo.png",
+  "primary_color": "#002c5f",
+  "secondary_color": "#0a192f",
+  "accent_color": "#00aad2",
+  "avatar_name": "Aria",
+  "avatar_voice": "Aoede",
+  "source_urls": [
+    "https://www.hyundai.com/in/en",
+    "https://www.hyundai.com/in/en/find-a-car/ioniq-5"
+  ],
+  "is_active": false,
+  "vehicles": [
+    {
+      "id": "ioniq_5",
+      "name": "Hyundai IONIQ 5",
+      "tagline": "Custom Verified Source of Truth Tagline",
+      "category": "Born Electric SUV",
+      "price_range": "\u20b948.00 Lakh",
+      "hero_image": "/uploads/hyundai/vehicles/ioniq_5_1788249211.png",
+      "engine_specs": "Permanent Magnet Synchronous Motor (217 PS / 350 Nm)",
+      "seating_capacity": "5-Seater Lounge Cabin",
+      "fuel_or_battery": "72.6 kWh Battery (350 kW DC Fast Charge)",
+      "range_or_mileage": "631 km (ARAI Certified Range)",
+      "key_highlights": [
+        "E-GMP Dedicated EV Architecture with Ultra-Fast 800V Charging (10-80% in 18 mins)",
+        "Vehicle-to-Load (V2L) Inside & Outside Power Output",
+        "Parametric Pixel LED Headlamps & Sliding Universal Island Console",
+        "Hyundai SmartSense Level 2 ADAS with 21 Autonomous Features",
+        "Bose Premium 8-Speaker Audio System"
+      ],
+      "usp": "World Car of the Year winner offering ultra-fast 800V charging, flat living space floor, and 631km range.",
+      "variants": [
+        {
+          "name": "RWD Long Range (72.6 kWh)",
+          "price_ex_showroom": "\u20b946.05 Lakh",
+          "engine_or_battery": "217 PS / 350 Nm Electric Motor",
+          "transmission": "Single Speed Reduction Gear",
+          "key_features": [
+            "800V Ultra-Fast Charging",
+            "V2L Power",
+            "SmartSense Level 2 ADAS",
+            "Vision Roof"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/hyundai/vehicles/ioniq_5_1788249211.png"
+    },
+    {
+      "id": "creta",
+      "name": "Hyundai Creta (New)",
+      "tagline": "Undisputed. Ultimate. The Leader of Indian Roads",
+      "category": "Authentic SUV",
+      "price_range": "\u20b911.00 Lakh - \u20b920.15 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/141115/creta-exterior-right-front-three-quarter-16.jpeg",
+      "engine_specs": "1.5L Turbo GDi Petrol (160 PS) & 1.5L U2 CRDi Diesel (116 PS)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel (6-Speed MT / IVT / 7-Speed DCT / 6-Speed AT)",
+      "range_or_mileage": "18.4 km/l (Diesel MT)",
+      "key_highlights": [
+        "Hyundai SmartSense Level 2 ADAS with 19 Safety Features",
+        "Seamless Dual 10.25-inch Infotainment & Digital Driver Displays",
+        "Voice Enabled Smart Panoramic Sunroof",
+        "Ventilated Front Seats & 8-Way Powered Driver Seat",
+        "Bose Premium Sound System with 8 Speakers"
+      ],
+      "usp": "India's highest-selling midsize SUV with bold parametric jewel styling and Level 2 ADAS.",
+      "variants": [
+        {
+          "name": "SX (O) 1.5 Turbo DCT",
+          "price_ex_showroom": "\u20b920.00 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol (160 PS / 253 Nm)",
+          "transmission": "7-Speed Dual Clutch Transmission",
+          "key_features": [
+            "Level 2 ADAS",
+            "Panoramic Sunroof",
+            "Ventilated Seats",
+            "360-Degree Camera"
+          ]
+        },
+        {
+          "name": "SX (O) 1.5 CRDi Diesel AT",
+          "price_ex_showroom": "\u20b920.15 Lakh",
+          "engine_or_battery": "1.5L Diesel (116 PS / 250 Nm)",
+          "transmission": "6-Speed Automatic",
+          "key_features": [
+            "Level 2 ADAS",
+            "Bose Audio",
+            "Leatherette Upholstery",
+            "Paddle Shifters"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "tucson",
+      "name": "Hyundai Tucson",
+      "tagline": "Next-Level Premium Flagship SUV with Visionary Design",
+      "category": "Tech SUV",
+      "price_range": "\u20b929.02 Lakh - \u20b935.94 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/106815/tucson-exterior-right-front-three-quarter-4.jpeg",
+      "engine_specs": "2.0L Nu Petrol (156 PS) & 2.0L R-Series Diesel (186 PS / 416 Nm)",
+      "seating_capacity": "5-Seater Flagship",
+      "fuel_or_battery": "Petrol (6-Speed AT) / Diesel (8-Speed AT / HTRAC AWD)",
+      "range_or_mileage": "15.38 km/l (Diesel AT)",
+      "key_highlights": [
+        "HTRAC All-Wheel Drive with Multi-Terrain Modes (Snow, Mud, Sand)",
+        "Hyundai SmartSense Level 2 ADAS Suite (Blind Spot Collision Avoidance)",
+        "Parametric Hidden DRL Lights & Diffuse Multi-Air Climate Mode",
+        "Heated & Ventilated Front Seats with Memory Function",
+        "Hands-Free Smart Power Tailgate"
+      ],
+      "usp": "Flagship global luxury SUV with 416 Nm diesel punch and HTRAC all-weather traction.",
+      "variants": [
+        {
+          "name": "Signature 2.0 4WD AT Diesel",
+          "price_ex_showroom": "\u20b935.94 Lakh",
+          "engine_or_battery": "2.0L Diesel (186 PS / 416 Nm)",
+          "transmission": "8-Speed Torque Converter AT (HTRAC 4WD)",
+          "key_features": [
+            "HTRAC 4WD",
+            "Level 2 ADAS",
+            "Panoramic Sunroof",
+            "Heated/Ventilated Seats"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "venue",
+      "name": "Hyundai Venue & Venue N-Line",
+      "tagline": "Live the Lit Life \u2014 Smart Urban Connected SUV",
+      "category": "Tech SUV",
+      "price_range": "\u20b97.94 Lakh - \u20b913.48 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/124113/venue-exterior-right-front-three-quarter.jpeg",
+      "engine_specs": "1.0L Turbo GDi (120 PS / 172 Nm) & 1.5L Diesel (116 PS)",
+      "seating_capacity": "5-Seater Urban",
+      "fuel_or_battery": "Petrol / Diesel (MT / 7-Speed DCT)",
+      "range_or_mileage": "18.3 km/l",
+      "key_highlights": [
+        "Smart Electric Sunroof & Connecting LED Tail Lamps",
+        "ADAS Level 1 (Forward Collision Warning, Lane Keep Assist)",
+        "Dual Tone Black & Greige Interiors with 2-Step Rear Reclining Seats",
+        "8-inch Touchscreen with Alexa & Google Home Voice Integration"
+      ],
+      "usp": "Agile compact SUV with punchy turbo power and first-in-segment ADAS safety.",
+      "variants": [
+        {
+          "name": "SX (O) 1.0 Turbo DCT",
+          "price_ex_showroom": "\u20b913.23 Lakh",
+          "engine_or_battery": "1.0L Turbo Petrol (120 PS)",
+          "transmission": "7-Speed DCT",
+          "key_features": [
+            "Level 1 ADAS",
+            "Sunroof",
+            "Connected Car Tech",
+            "Air Purifier"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    }
+  ],
+  "dealerships": [
+    {
+      "id": "hyundai_mumbai_central",
+      "name": "Modi Hyundai, Mumbai Central",
+      "address": "Opp. Nehru Science Center, Dr. E Moses Road, Worli, Mumbai, MH 400018",
+      "city": "Mumbai",
+      "phone": "+91 22 6622 7700",
+      "rating": 4.9,
+      "available_advisors": [
+        "Aarav Sharma (EV & SmartSense Specialist)",
+        "Sneha Kulkarni"
+      ],
+      "has_test_drive_home_pickup": true
+    },
+    {
+      "id": "hyundai_andheri",
+      "name": "Shreenath Hyundai, Andheri West",
+      "address": "New Link Road, Near Infiniti Mall, Andheri West, Mumbai, MH 400053",
+      "city": "Mumbai",
+      "phone": "+91 22 2673 8899",
+      "rating": 4.8,
+      "available_advisors": [
+        "Rohan Mehta",
+        "Priyanka Joshi"
+      ],
+      "has_test_drive_home_pickup": true
+    }
+  ]
+}

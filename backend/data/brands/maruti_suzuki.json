@@ -1,0 +1,237 @@
+{
+  "id": "maruti_suzuki",
+  "name": "Maruti Suzuki (NEXA)",
+  "tagline": "Create. Inspire. Experience Premium Mobility & Intelligent Hybrids",
+  "logo_url": "https://www.nexaexperience.com/assets/images/nexa-logo.png",
+  "primary_color": "#1b2028",
+  "secondary_color": "#0d1117",
+  "accent_color": "#e11d48",
+  "avatar_name": "Karan",
+  "avatar_voice": "Fenrir",
+  "source_urls": [
+    "https://www.nexaexperience.com",
+    "https://www.marutisuzuki.com"
+  ],
+  "is_active": false,
+  "vehicles": [
+    {
+      "id": "grand_vitara",
+      "name": "Maruti Suzuki Grand Vitara",
+      "tagline": "Rule Every Road \u2014 Intelligent Electric Hybrid & AllGrip 4x4",
+      "category": "Authentic SUV",
+      "price_range": "\u20b910.87 Lakh - \u20b920.09 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/123185/grand-vitara-exterior-right-front-three-quarter-4.jpeg",
+      "engine_specs": "1.5L Intelligent Electric Hybrid (116 PS) & 1.5L K15C DualJet (103 PS)",
+      "seating_capacity": "5-Seater Premium SUV",
+      "fuel_or_battery": "Strong Hybrid (e-CVT) / Petrol (5-MT / 6-AT / AllGrip AWD)",
+      "range_or_mileage": "27.97 km/l (Strong Hybrid India's Most Fuel Efficient SUV)",
+      "key_highlights": [
+        "Intelligent Electric Hybrid with Dedicated Pure EV Silent Drive Mode",
+        "AllGrip Select Electronic 4WD (Auto, Sport, Snow, Lock Modes)",
+        "Panoramic Sunroof & Head-Up Display (HUD)",
+        "360-Degree View Camera & Ventilated Front Seats",
+        "Qi Wireless Charger & Suzuki Connect with 40+ Features"
+      ],
+      "usp": "India's most fuel-efficient SUV delivering 27.97 km/l with pure EV silent cruising and authentic AllGrip 4x4 capability.",
+      "variants": [
+        {
+          "name": "Alpha+ Intelligent Hybrid e-CVT",
+          "price_ex_showroom": "\u20b919.99 Lakh",
+          "engine_or_battery": "1.5L Strong Hybrid (116 PS Combined)",
+          "transmission": "e-CVT (Electric Continuous Variable)",
+          "key_features": [
+            "27.97 km/l Mileage",
+            "EV Mode",
+            "Panoramic Sunroof",
+            "HUD",
+            "Ventilated Seats"
+          ]
+        },
+        {
+          "name": "Alpha AllGrip AWD 5MT",
+          "price_ex_showroom": "\u20b917.01 Lakh",
+          "engine_or_battery": "1.5L K-Series DualJet (103 PS / 137 Nm)",
+          "transmission": "5-Speed Manual AllGrip 4WD",
+          "key_features": [
+            "AllGrip Electronic 4x4",
+            "Auto/Sport/Snow Modes",
+            "Hill Descent Control"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "fronx",
+      "name": "Maruti Suzuki Fronx (Turbo & Boosterjet)",
+      "tagline": "The Shape of New \u2014 Aerodynamic Turbo Coupe SUV",
+      "category": "Tech SUV",
+      "price_range": "\u20b97.52 Lakh - \u20b913.04 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/130583/fronx-exterior-right-front-three-quarter-109.jpeg",
+      "engine_specs": "1.0L K-Series Boosterjet Turbo (100 PS / 148 Nm) & 1.2L DualJet (90 PS)",
+      "seating_capacity": "5-Seater Coupe SUV",
+      "fuel_or_battery": "Petrol / Smart Hybrid (5-MT / 6-Speed AT with Paddle Shifters)",
+      "range_or_mileage": "20.01 km/l (Turbo AT)",
+      "key_highlights": [
+        "1.0L Direct Injection Boosterjet Turbo with Instant Acceleration",
+        "Aerodynamic Sloping Fastback Roofline & Geometric Precision Grille",
+        "Head-Up Display with Turn-by-Turn Navigation",
+        "9-inch SmartPlay Pro+ Infotainment with Wireless CarPlay & Android Auto",
+        "360 View Camera & 6 Airbags Protection"
+      ],
+      "usp": "Bold geometric coupe silhouette paired with responsive 100PS Boosterjet turbo power.",
+      "variants": [
+        {
+          "name": "Alpha 1.0L Turbo 6AT",
+          "price_ex_showroom": "\u20b912.98 Lakh",
+          "engine_or_battery": "1.0L Boosterjet Turbo (100 PS)",
+          "transmission": "6-Speed Automatic with Paddle Shifters",
+          "key_features": [
+            "Boosterjet Turbo",
+            "HUD",
+            "360 Camera",
+            "Paddle Shifters",
+            "Wireless CarPlay"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "jimny",
+      "name": "Maruti Suzuki Jimny (5-Door 4x4)",
+      "tagline": "Pure Off-Road Heritage Since 1970 \u2014 Go Anywhere, Conquer Anything",
+      "category": "Authentic SUV",
+      "price_range": "\u20b912.74 Lakh - \u20b914.95 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/130589/jimny-exterior-right-front-three-quarter-72.jpeg",
+      "engine_specs": "1.5L K15B Petrol with Idle Start-Stop (105 PS / 134 Nm)",
+      "seating_capacity": "4-Seater Genuine 4x4",
+      "fuel_or_battery": "Petrol (5-Speed MT / 4-Speed AT with 4x4 Low Range)",
+      "range_or_mileage": "16.94 km/l",
+      "key_highlights": [
+        "ALLGRIP PRO 4WD with Dedicated Low-Range Transfer Gear (2H, 4H, 4L)",
+        "Rigid Ladder Frame Chassis with 3-Link Rigid Axle Suspension & Coil Springs",
+        "Brake Limited Slip Differential (Brake LSD) for Extreme Rock Crawling",
+        "36-degree Approach Angle, 50-degree Departure Angle & 210mm Ground Clearance",
+        "Scratch-Resistant Textured Cockpit with 9-inch SmartPlay Infotainment"
+      ],
+      "usp": "Lightweight body-on-frame authentic off-roader with ALLGRIP PRO low-range gear to conquer any trail.",
+      "variants": [
+        {
+          "name": "Alpha 4WD AT Dual Tone",
+          "price_ex_showroom": "\u20b914.95 Lakh",
+          "engine_or_battery": "1.5L K15B Petrol (105 PS)",
+          "transmission": "4-Speed Automatic 4WD ALLGRIP PRO",
+          "key_features": [
+            "ALLGRIP PRO 4x4",
+            "Brake LSD",
+            "Headlamp Washers",
+            "Cruise Control"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "brezza",
+      "name": "Maruti Suzuki Brezza",
+      "tagline": "City Breaker \u2014 High Stance, Electric Sunroof & Connected Tech",
+      "category": "Tech SUV",
+      "price_range": "\u20b98.34 Lakh - \u20b914.14 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/107543/brezza-exterior-right-front-three-quarter-7.jpeg",
+      "engine_specs": "1.5L K15C DualJet Smart Hybrid (103 PS / 137 Nm)",
+      "seating_capacity": "5-Seater Compact SUV",
+      "fuel_or_battery": "Petrol / Smart Hybrid (5-MT / 6-Speed AT)",
+      "range_or_mileage": "19.89 km/l",
+      "key_highlights": [
+        "Electric Sunroof with Anti-Pinch & Head-Up Display",
+        "360-Degree View Camera & Wireless Phone Charging",
+        "Dual-Tone Geometric Alloy Wheels & Dual LED Projectors",
+        "Arkamys Surround Sense Tuned Audio"
+      ],
+      "usp": "Rock-solid reliability with low ownership costs and modern high-tech cabin.",
+      "variants": [
+        {
+          "name": "ZXi+ Dual Tone AT",
+          "price_ex_showroom": "\u20b914.14 Lakh",
+          "engine_or_battery": "1.5L DualJet Smart Hybrid (103 PS)",
+          "transmission": "6-Speed AT with Paddle Shifters",
+          "key_features": [
+            "Electric Sunroof",
+            "HUD",
+            "360 Camera",
+            "Wireless Charger"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "invicto",
+      "name": "Maruti Suzuki Invicto",
+      "tagline": "The Grand Opulence \u2014 Luxury Strong Hybrid MPV",
+      "category": "Authentic SUV",
+      "price_range": "\u20b925.30 Lakh - \u20b929.02 Lakh (Ex-Showroom)",
+      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/151141/invicto-exterior-right-front-three-quarter.jpeg",
+      "engine_specs": "2.0L Intelligent Electric Hybrid with High Output Motor (186 PS)",
+      "seating_capacity": "7 / 8-Seater Ottoman Luxury Lounge",
+      "fuel_or_battery": "Strong Hybrid (e-CVT)",
+      "range_or_mileage": "21.19 km/l (ARAI)",
+      "key_highlights": [
+        "Captain Seats with Walk-in Slide & Individual Armrests",
+        "Panoramic Sunroof with Ambient Mood Lighting",
+        "Dual-Zone Automatic Climate Control with Front & Rear Blowers",
+        "One-Touch Powered Tailgate & 10.1-inch SmartPlay Pro+ Touchscreen"
+      ],
+      "usp": "Ultra-luxurious spacious hybrid lounge delivering 21+ km/l for executive long trips.",
+      "variants": [
+        {
+          "name": "Alpha+ 7-Seater e-CVT",
+          "price_ex_showroom": "\u20b928.92 Lakh",
+          "engine_or_battery": "2.0L Strong Hybrid (186 PS Combined)",
+          "transmission": "e-CVT",
+          "key_features": [
+            "Panoramic Sunroof",
+            "Ventilated Ottoman Seats",
+            "Powered Tailgate",
+            "360 Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    }
+  ],
+  "dealerships": [
+    {
+      "id": "nexa_lower_parel",
+      "name": "NEXA Lower Parel, Mumbai",
+      "address": "Phoenix Mills Compound, Senapati Bapat Marg, Lower Parel, Mumbai, MH 400013",
+      "city": "Mumbai",
+      "phone": "+91 22 2498 3300",
+      "rating": 4.9,
+      "available_advisors": [
+        "Vikram Malhotra (NEXA Senior Relationship Manager)",
+        "Priya Desai"
+      ],
+      "has_test_drive_home_pickup": true
+    },
+    {
+      "id": "nexa_andheri",
+      "name": "NEXA Andheri East, Mumbai",
+      "address": "Andheri-Kurla Road, Near Chakala Metro, Andheri East, Mumbai, MH 400093",
+      "city": "Mumbai",
+      "phone": "+91 22 4242 5500",
+      "rating": 4.8,
+      "available_advisors": [
+        "Sanjay Rathi",
+        "Deepak Verma"
+      ],
+      "has_test_drive_home_pickup": true
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+steps:
+  # Build Backend Container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/mahindra-mia-backend:latest', './backend']
+
+  # Build Frontend Container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/mahindra-mia-frontend:latest', './frontend']
+
+  # Push Backend to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/mahindra-mia-backend:latest']
+
+  # Push Frontend to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/mahindra-mia-frontend:latest']
+
+  # Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'mahindra-mia-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/mahindra-mia-backend:latest'
+      - '--region'
+      - 'asia-south1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8000'
+
+  # Deploy Frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'mahindra-mia-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/mahindra-mia-frontend:latest'
+      - '--region'
+      - 'asia-south1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '3000'
+
+images:
+  - 'gcr.io/$PROJECT_ID/mahindra-mia-backend:latest'
+  - 'gcr.io/$PROJECT_ID/mahindra-mia-frontend:latest'

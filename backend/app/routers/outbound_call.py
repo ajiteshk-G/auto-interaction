@@ -16,6 +16,7 @@ from app.schemas.outbound_call import (
     OutboundCallInsightsResponse
 )
 from app.services.outbound_call_service import OutboundCallService
+from app.services.brand_service import BrandService
 
 router = APIRouter(prefix="/outbound", tags=["Outbound Post-Ride Proactive Voice Call"])
 

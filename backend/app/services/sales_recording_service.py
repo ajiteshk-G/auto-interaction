@@ -326,8 +326,6 @@ class SalesRecordingService:
             logger.error(f"Failed to upload to GCS bucket {gcs_bucket}: {e}")
 
         # 4. Vehicle metadata and Advisor details
-        from app.services.brand_service import BrandService
-
         # Resolve active / requested brand
         brand_id = getattr(req, "brand_id", None)
         brand = BrandService.get_brand(brand_id) if brand_id else None

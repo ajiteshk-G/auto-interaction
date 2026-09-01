@@ -29,13 +29,19 @@ async def list_vehicles(category: Optional[str] = None):
     return result
 
 @router.get("/dealerships", response_model=List[DealershipItem])
-async def list_dealerships(city: Optional[str] = None, db: AsyncSession = Depends(get_db)):
-    cache_key = f"dealerships_{city or 'all'}"
+async def list_dealerships(
+    city: Optional[str] = None,
+    brand_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    from app.services.brand_service import BrandService
+    b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+    cache_key = f"dealerships_{b_id}_{city or 'all'}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
-    stmt = select(Dealership).where(Dealership.is_active == True)
+    stmt = select(Dealership).where(Dealership.is_active == True, Dealership.brand_id == b_id)
     if city:
         stmt = stmt.where(func.lower(Dealership.city) == city.lower())
     res = await db.execute(stmt)
@@ -49,13 +55,34 @@ async def list_dealerships(city: Optional[str] = None, db: AsyncSession = Depend
                 city=d.city,
                 phone=d.phone,
                 rating=d.rating or 4.8,
-                available_advisors=d.available_advisors or ["Rajesh Varma"],
+                available_advisors=d.available_advisors or ["Official Specialist"],
                 has_test_drive_home_pickup=True
             )
             for d in dealers
         ]
         cache.set(cache_key, result, ttl_seconds=600)
         return result
+
+    # Fallback from BrandService catalog if not yet seeded
+    brand = BrandService.get_brand(b_id)
+    if brand and brand.dealerships:
+        result = [
+            DealershipItem(
+                id=d.id,
+                name=d.name,
+                address=d.address,
+                city=d.city,
+                phone=d.phone,
+                rating=d.rating or 4.8,
+                available_advisors=d.available_advisors or ["Official Specialist"],
+                has_test_drive_home_pickup=True
+            )
+            for d in brand.dealerships
+            if not city or d.city.lower() == city.lower()
+        ]
+        if result:
+            cache.set(cache_key, result, ttl_seconds=600)
+            return result
 
     fallback = CatalogService.get_dealerships()
     cache.set(cache_key, fallback, ttl_seconds=600)

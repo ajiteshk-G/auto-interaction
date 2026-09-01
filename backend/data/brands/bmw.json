@@ -1,0 +1,255 @@
+{
+  "id": "bmw",
+  "name": "BMW",
+  "tagline": "The Ultimate Driving Machine",
+  "logo_url": "https://www.bmw.in/content/dam/bmw/common/images/logo-icons/BMW/BMW_White_Logo.svg.asset.1670245093434.svg",
+  "primary_color": "#0066b1",
+  "secondary_color": "#0f172a",
+  "accent_color": "#38bdf8",
+  "avatar_name": "Kavya",
+  "avatar_voice": "Aoede",
+  "source_urls": [
+    "https://www.bmw.in/en/index.html"
+  ],
+  "is_active": false,
+  "vehicles": [
+    {
+      "id": "bmw-3-series-gran-limousine",
+      "name": "BMW 3 Series Gran Limousine",
+      "tagline": "More Space. More Luxury. More Thrills.",
+      "category": "Sedan",
+      "price_range": "\u20b960.60 Lakh - \u20b962.60 Lakh",
+      "hero_image": "/uploads/bmw/vehicles/bmw-3-series-gran-limousine_1788255293.jpeg",
+      "engine_specs": "2.0L TwinPower Turbo Petrol (258 hp, 400 Nm) / 2.0L TwinPower Turbo Diesel (190 hp, 400 Nm)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "15.39 km/l (Petrol) / 19.61 km/l (Diesel)",
+      "key_highlights": [
+        "Extended wheelbase for enhanced rear comfort",
+        "Sporty design with M Sport package",
+        "Advanced BMW Curved Display",
+        "Panoramic glass sunroof"
+      ],
+      "usp": "Combines the iconic sportiness of the 3 Series with unparalleled rear-seat luxury and space.",
+      "variants": [
+        {
+          "name": "330Li M Sport",
+          "price_ex_showroom": "\u20b960,60,000",
+          "engine_or_battery": "2.0L TwinPower Turbo Petrol (258 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "BMW Live Cockpit Professional",
+            "Harman Kardon Surround Sound System",
+            "Comfort Access System"
+          ]
+        },
+        {
+          "name": "320Ld M Sport",
+          "price_ex_showroom": "\u20b962,60,000",
+          "engine_or_battery": "2.0L TwinPower Turbo Diesel (190 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "BMW Live Cockpit Professional",
+            "Harman Kardon Surround Sound System",
+            "Comfort Access System"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/bmw/vehicles/bmw-3-series-gran-limousine_1788255293.jpeg"
+    },
+    {
+      "id": "bmw-x1",
+      "name": "BMW X1",
+      "tagline": "Unleash Your Everyday Adventure.",
+      "category": "SUV",
+      "price_range": "\u20b949.50 Lakh - \u20b952.50 Lakh",
+      "hero_image": "/uploads/bmw/vehicles/bmw-x1_1788255372.jpeg",
+      "engine_specs": "1.5L TwinPower Turbo Petrol (136 hp, 230 Nm) / 2.0L TwinPower Turbo Diesel (150 hp, 360 Nm)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "16.32 km/l (Petrol) / 19.33 km/l (Diesel)",
+      "key_highlights": [
+        "Bold and dynamic exterior design",
+        "Spacious and versatile interior",
+        "BMW Curved Display with iDrive 8",
+        "Advanced driver assistance systems"
+      ],
+      "usp": "A compact luxury SUV that perfectly blends urban agility with BMW's signature driving dynamics and premium features.",
+      "variants": [
+        {
+          "name": "sDrive18i M Sport",
+          "price_ex_showroom": "\u20b949,50,000",
+          "engine_or_battery": "1.5L TwinPower Turbo Petrol (136 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Sport seats for driver and front passenger",
+            "Wireless charging"
+          ]
+        },
+        {
+          "name": "sDrive18d M Sport",
+          "price_ex_showroom": "\u20b952,50,000",
+          "engine_or_battery": "2.0L TwinPower Turbo Diesel (150 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Sport seats for driver and front passenger",
+            "Wireless charging"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/bmw/vehicles/bmw-x1_1788255372.jpeg"
+    },
+    {
+      "id": "bmw-x5",
+      "name": "BMW X5",
+      "tagline": "The Boss of the Road.",
+      "category": "SUV",
+      "price_range": "\u20b998.50 Lakh - \u20b91.15 Crore",
+      "hero_image": "https://imgd.aeplcdn.com/1056x594/n/cw/ec/152681/x5-facelift-exterior-right-front-three-quarter-3.jpeg",
+      "engine_specs": "3.0L TwinPower Turbo Petrol (381 hp, 520 Nm) / 3.0L TwinPower Turbo Diesel (286 hp, 650 Nm)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "11.2 km/l (Petrol) / 12.0 km/l (Diesel)",
+      "key_highlights": [
+        "Powerful engine options with xDrive AWD",
+        "Luxurious and spacious interior",
+        "Advanced infotainment with BMW Curved Display",
+        "Adaptive 2-axle air suspension"
+      ],
+      "usp": "A commanding luxury SUV offering a perfect blend of performance, comfort, and cutting-edge technology for an unparalleled driving experience.",
+      "variants": [
+        {
+          "name": "xDrive40i M Sport",
+          "price_ex_showroom": "\u20b998,50,000",
+          "engine_or_battery": "3.0L TwinPower Turbo Petrol (381 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Harman Kardon Surround Sound System",
+            "Parking Assistant Plus"
+          ]
+        },
+        {
+          "name": "xDrive30d M Sport",
+          "price_ex_showroom": "\u20b91,15,00,000",
+          "engine_or_battery": "3.0L TwinPower Turbo Diesel (286 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Harman Kardon Surround Sound System",
+            "Parking Assistant Plus"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "bmw-ix",
+      "name": "BMW iX",
+      "tagline": "The Future of Driving. Electrified.",
+      "category": "Born Electric SUV",
+      "price_range": "\u20b91.21 Crore",
+      "hero_image": "/uploads/bmw/vehicles/bmw-ix_1788255386.jpeg",
+      "engine_specs": "Dual Electric Motors (326 hp, 630 Nm for xDrive40)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Electric",
+      "range_or_mileage": "425 km WLTP (xDrive40)",
+      "key_highlights": [
+        "Progressive and minimalist design",
+        "Sustainable materials in the interior",
+        "BMW Curved Display with iDrive 8",
+        "Advanced driver assistance systems"
+      ],
+      "usp": "BMW's flagship electric SUV, combining groundbreaking design, sustainable luxury, and exhilarating electric performance.",
+      "variants": [
+        {
+          "name": "iX xDrive40",
+          "price_ex_showroom": "\u20b91,21,00,000",
+          "engine_or_battery": "Dual Electric Motors (326 hp)",
+          "transmission": "Single-Speed",
+          "key_features": [
+            "BMW eDrive technology",
+            "Integrated Universal Charger",
+            "Panoramic Sky Lounge LED Roof",
+            "Bowers & Wilkins Diamond Surround Sound System"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/bmw/vehicles/bmw-ix_1788255386.jpeg"
+    },
+    {
+      "id": "bmw-5-series",
+      "name": "BMW 5 Series",
+      "tagline": "The Business Athlete.",
+      "category": "Sedan",
+      "price_range": "\u20b965.40 Lakh - \u20b974.50 Lakh",
+      "hero_image": "/uploads/bmw/vehicles/bmw-5-series_1788255418.jpeg",
+      "engine_specs": "2.0L TwinPower Turbo Petrol (252 hp, 350 Nm) / 2.0L TwinPower Turbo Diesel (190 hp, 400 Nm)",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "14.82 km/l (Petrol) / 20.37 km/l (Diesel)",
+      "key_highlights": [
+        "Elegant and dynamic exterior design",
+        "Luxurious and technologically advanced cabin",
+        "Exceptional driving comfort and handling",
+        "BMW Live Cockpit Professional"
+      ],
+      "usp": "The executive sedan that perfectly balances sporty performance, sophisticated luxury, and cutting-edge technology.",
+      "variants": [
+        {
+          "name": "530i M Sport",
+          "price_ex_showroom": "\u20b965,40,000",
+          "engine_or_battery": "2.0L TwinPower Turbo Petrol (252 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Harman Kardon Surround Sound System",
+            "Parking Assistant"
+          ]
+        },
+        {
+          "name": "520d M Sport",
+          "price_ex_showroom": "\u20b974,50,000",
+          "engine_or_battery": "2.0L TwinPower Turbo Diesel (190 hp)",
+          "transmission": "Automatic",
+          "key_features": [
+            "M Sport package",
+            "Adaptive LED Headlights",
+            "Harman Kardon Surround Sound System",
+            "Parking Assistant"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/bmw/vehicles/bmw-5-series_1788255418.jpeg"
+    }
+  ],
+  "dealerships": [
+    {
+      "id": "flagship_center_1",
+      "name": "BMW Experience Center",
+      "address": "Flagship Showroom Avenue, Metro Downtown",
+      "city": "Mumbai",
+      "phone": "+91 22 4000 8800",
+      "rating": 4.9,
+      "available_advisors": [
+        "Senior Brand Specialist",
+        "Product Genius"
+      ],
+      "has_test_drive_home_pickup": true
+    }
+  ]
+}

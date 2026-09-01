@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { VehicleItem, CustomerProfile, TestRideLeadItem, TestRideInsightResponse, DealershipItem } from "@/types";
+import { VehicleItem, CustomerProfile, TestRideLeadItem, TestRideInsightResponse, DealershipItem, BrandCatalog } from "@/types";
 import {
   Smartphone,
   Mic,
@@ -36,6 +36,7 @@ interface SalesMobileAppProps {
   vehicles: VehicleItem[];
   profile: CustomerProfile | null;
   selectedVehicleId?: string;
+  brand?: BrandCatalog | null;
   onProceedToOutboundCall: (insights: TestRideInsightResponse) => void;
   isStandalone?: boolean;
 }
@@ -44,6 +45,7 @@ export function SalesMobileApp({
   vehicles,
   profile,
   selectedVehicleId = "thar_roxx",
+  brand,
   onProceedToOutboundCall,
   isStandalone = false
 }: SalesMobileAppProps) {
@@ -79,26 +81,30 @@ export function SalesMobileApp({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // 1. Load Dealerships on Mount
+  // 1. Load Dealerships on Mount or Brand Change
   useEffect(() => {
     async function loadDealers() {
       try {
-        const dealers = await fetchDealerships();
-        if (dealers && dealers.length > 0) {
-          setDealerships(dealers);
+        if (brand?.dealerships && brand.dealerships.length > 0) {
+          setDealerships(brand.dealerships);
+        } else {
+          const dealers = await fetchDealerships(undefined, brand?.id);
+          if (dealers && dealers.length > 0) {
+            setDealerships(dealers);
+          }
         }
       } catch (e) {
         console.error("Failed to load dealerships:", e);
       }
     }
     loadDealers();
-  }, []);
+  }, [brand?.id]);
 
-  // 2. Load Leads whenever selected showroom changes
+  // 2. Load Leads whenever selected showroom or brand changes
   const loadLeadsForShowroom = async (dealershipId: string) => {
     setIsLoadingLeads(true);
     try {
-      const data = await fetchSalesLeads(dealershipId);
+      const data = await fetchSalesLeads(dealershipId, brand?.id);
       if (data && data.length > 0) {
         setLeads(data);
         // Select the first lead by default
@@ -122,7 +128,7 @@ export function SalesMobileApp({
 
   useEffect(() => {
     loadLeadsForShowroom(selectedShowroom);
-  }, [selectedShowroom]);
+  }, [selectedShowroom, brand?.id]);
 
   // Auto-fetch persisted test ride insights whenever selectedLead changes
   useEffect(() => {
@@ -136,7 +142,8 @@ export function SalesMobileApp({
         const persisted = await fetchLatestTestRideInsights({
           customer_id: selectedLead?.customer_id || profile?.customer_id,
           booking_reference: selectedLead?.booking_reference,
-          phone: selectedLead?.phone || profile?.phone
+          phone: selectedLead?.phone || profile?.phone,
+          brand_id: brand?.id
         });
         if (persisted && persisted.session_id) {
           setInsights(persisted);
@@ -152,7 +159,7 @@ export function SalesMobileApp({
       }
     }
     loadPersistedInsights();
-  }, [selectedLead, profile]);
+  }, [selectedLead, profile, brand?.id]);
 
   // Handle lead selection - dynamic vehicle extraction from booking
   const handleSelectLead = async (lead: TestRideLeadItem) => {
@@ -271,13 +278,15 @@ export function SalesMobileApp({
         });
       }
 
+      const brandDisplayName = brand?.name || "Official Dealership";
       const response = await uploadTestRideRecording({
         customer_id: selectedLead?.customer_id || profile?.customer_id || "CUST-AARAV-001",
         booking_reference: selectedLead?.booking_reference,
         customer_name: selectedLead?.name || profile?.name,
+        brand_id: brand?.id || "mahindra",
         vehicle_id: testVehicleId,
         variant: selectedVariant,
-        sales_advisor_name: selectedLead?.dealership_name ? `Specialist (${selectedLead.dealership_name})` : "Rajesh Varma (Bayview Mahindra)",
+        sales_advisor_name: selectedLead?.dealership_name ? `Specialist (${selectedLead.dealership_name})` : `Advisor (${brandDisplayName})`,
         duration_seconds: Math.max(recordingSeconds, 1),
         audio_format: detectedMime,
         audio_base64: base64Audio,
@@ -306,13 +315,15 @@ export function SalesMobileApp({
     setRecordingSeconds(184);
 
     try {
+      const brandDisplayName = brand?.name || "Official Dealership";
       const response = await uploadTestRideRecording({
         customer_id: selectedLead?.customer_id || profile?.customer_id || "CUST-AARAV-001",
         booking_reference: selectedLead?.booking_reference,
         customer_name: selectedLead?.name || profile?.name,
+        brand_id: brand?.id || "mahindra",
         vehicle_id: testVehicleId,
         variant: selectedVariant,
-        sales_advisor_name: selectedLead?.dealership_name ? `Specialist (${selectedLead.dealership_name})` : "Rajesh Varma (Bayview Mahindra)",
+        sales_advisor_name: selectedLead?.dealership_name ? `Specialist (${selectedLead.dealership_name})` : `Advisor (${brandDisplayName})`,
         duration_seconds: 184,
         audio_format: "audio/wav",
         simulated_scenario: "test_drive_simulation",
@@ -353,8 +364,8 @@ export function SalesMobileApp({
       {/* App Top Bar */}
       <div className="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shadow-2xs">
                 <div>
-                  <span className="text-[9.5px] text-red-600 font-bold uppercase tracking-wider block">
-                    Mahindra Field Companion
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider block" style={{ color: brand?.primary_color || "#dc2626" }}>
+                    {brand?.name || "Auto"} Field Companion
                   </span>
                   <span className="font-black text-slate-900 text-xs truncate max-w-[190px] block">
                     {activeShowroomName}

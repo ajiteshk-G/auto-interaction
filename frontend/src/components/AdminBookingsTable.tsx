@@ -51,6 +51,7 @@ export interface TranscriptTurn {
 export interface AdminBookingRecord {
   booking_id: number;
   booking_reference: string;
+  brand_id?: string;
   customer_id: string;
   customer_name: string;
   customer_phone: string;
@@ -112,6 +113,7 @@ export function AdminBookingsTable() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("" );
+  const [selectedBrand, setSelectedBrand] = useState<string>("ALL");
   const [selectedCity, setSelectedCity] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
 
@@ -158,34 +160,37 @@ export function AdminBookingsTable() {
         phone_number: b.customer_phone,
         vehicle_name: b.vehicle_name,
         variant: b.variant,
-        dealership_name: b.dealership_name,
-        booking_reference: b.booking_reference
+        booking_reference: b.booking_reference,
+        channel: outboundCallChannel
       });
 
-      setOutboundReference(resp.call_reference || `CALL-MIA-${Date.now().toString().slice(-4)}`);
-      
-      // Ring for 2.5 seconds then connect
-      setTimeout(() => {
-        setOutboundCallState("connected");
-        const greeting = `Namaste ${b.customer_name} ji! Main Mahindra Bayview Motors se MIA baat kar rahi hoon. Aapka ${b.vehicle_name} ka test drive experience kaisa raha?`;
+      setOutboundReference(resp.call_reference);
+      setOutboundCallState("connected");
+
+      if (outboundCallChannel === "twilio") {
+        setTwilioDispatchStatus(`Twilio Call placed to ${b.customer_phone}. Call Ref: ${resp.call_reference}`);
+      } else {
+        const welcomeTurn = resp.initial_greeting || `Namaste ${b.customer_name} ji! Main Mahindra se Kavya baat kar rahi hoon. Aapka ${b.vehicle_name} ka test drive kaisa raha?`;
         setOutboundDialogue([
-          { speaker: "MIA (Mahindra AI Voice Specialist)", text: greeting, time: "00:02" }
+          { speaker: "MIA (Mahindra AI Voice Specialist)", text: welcomeTurn, time: "00:01" }
         ]);
-        setOutboundTurnIndex(1);
-      }, 2500);
-    } catch (e) {
-      console.error("Failed to start outbound call:", e);
+      }
+    } catch (err: any) {
       setOutboundCallState("idle");
+      alert(`Outbound Call Error: ${err.message || "Failed to trigger call"}`);
     }
   };
 
-  const handleSendCustomerResponse = async (userText: string) => {
-    if (!activeOutboundBooking || outboundCallState !== "connected") return;
-    
-    const nowTime = String(Math.floor(callDurationSec / 60)).padStart(2, '0') + ":" + String(callDurationSec % 60).padStart(2, '0');
+  const handleSendCustomerResponse = async (userText?: string) => {
+    const textToSend = userText !== undefined ? userText : customInputText;
+    if (!textToSend.trim() || !outboundReference) return;
+    const userMsg = textToSend.trim();
+    if (userText === undefined) setCustomInputText("");
+
+    const turnTime = String(Math.floor(callDurationSec / 60)).padStart(2, '0') + ":" + String(callDurationSec % 60).padStart(2, '0');
     setOutboundDialogue((prev) => [
       ...prev,
-      { speaker: `${activeOutboundBooking.customer_name} (Customer)`, text: userText, time: nowTime }
+      { speaker: activeOutboundBooking?.customer_name || "Customer", text: userMsg, time: turnTime }
     ]);
 
     setIsAiSpeaking(true);
@@ -193,8 +198,8 @@ export function AdminBookingsTable() {
     try {
       const turnResp = await sendOutboundDialogueTurn({
         call_reference: outboundReference,
-        customer_response: userText,
-        turn_number: outboundTurnIndex + 1
+        customer_response: userMsg,
+        turn_index: outboundTurnIndex
       });
 
       setOutboundTurnIndex((prev) => prev + 1);
@@ -212,6 +217,8 @@ export function AdminBookingsTable() {
     }
   };
 
+  const handleSendDialogueTurn = () => handleSendCustomerResponse();
+
   const handleEndOutboundCall = () => {
     setOutboundCallState("ended");
   };
@@ -220,6 +227,7 @@ export function AdminBookingsTable() {
     setIsLoading(true);
     try {
       const queryParams = new URLSearchParams();
+      if (selectedBrand !== "ALL") queryParams.append("brand_id", selectedBrand);
       if (selectedCity !== "ALL") queryParams.append("city", selectedCity);
       if (selectedStatus !== "ALL") queryParams.append("status", selectedStatus);
       if (searchQuery.trim()) queryParams.append("search", searchQuery.trim());
@@ -239,7 +247,7 @@ export function AdminBookingsTable() {
 
   useEffect(() => {
     fetchBookings();
-  }, [selectedCity, selectedStatus]);
+  }, [selectedBrand, selectedCity, selectedStatus]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -358,6 +366,29 @@ export function AdminBookingsTable() {
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Brand Selector */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto scrollbar-thin">
+            {[
+              { id: "ALL", label: "All Brands" },
+              { id: "mahindra", label: "Mahindra" },
+              { id: "bmw", label: "BMW" },
+              { id: "hyundai", label: "Hyundai" },
+              { id: "maruti_suzuki", label: "Maruti Suzuki" }
+            ].map((b) => (
+              <button
+                key={b.id}
+                onClick={() => setSelectedBrand(b.id)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedBrand === b.id
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                }`}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+
           {/* City Selector */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto scrollbar-thin">
             {["ALL", "Mumbai", "Pune", "Delhi", "Bangalore", "Chennai"].map((city) => (
@@ -435,7 +466,7 @@ export function AdminBookingsTable() {
                     <div className="flex flex-col items-center justify-center gap-1">
                       <AlertCircle className="w-6 h-6 text-amber-500" />
                       <span className="font-bold text-slate-800">No test ride bookings matched your filter.</span>
-                      <span className="text-xs text-slate-400">Try changing the search keyword or city filter.</span>
+                      <span className="text-xs text-slate-400">Try changing the search keyword, brand or city filter.</span>
                     </div>
                   </td>
                 </tr>
@@ -458,8 +489,15 @@ export function AdminBookingsTable() {
                     >
                       {/* Column 1: Ref & Date */}
                       <td className="py-4 px-4 align-top">
-                        <div className="font-mono font-black text-red-700 text-xs">
-                          {booking.booking_reference}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-black text-red-700 text-xs">
+                            {booking.booking_reference}
+                          </span>
+                          {booking.brand_id && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                              {booking.brand_id}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 text-[11px] text-slate-800 font-bold mt-1">
                           <Calendar className="w-3 h-3 text-slate-500 shrink-0" />
@@ -1007,7 +1045,7 @@ export function AdminBookingsTable() {
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-cyan-600 shrink-0" />
                       <span>
-                        Live transcript for <strong>{activeModalBooking.customer_name}</strong> ({activeModalBooking.customer_phone}) with <strong>Kabir (AI Specialist)</strong>.
+                        Live transcript for <strong>{activeModalBooking.customer_name}</strong> ({activeModalBooking.customer_phone}) with <strong>Kavya (AI Specialist)</strong>.
                       </span>
                     </div>
                     <span className="text-[11px] font-mono bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-lg border border-cyan-300 font-bold shrink-0">

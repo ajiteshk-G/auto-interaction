@@ -109,10 +109,10 @@ export function CustomerLeadModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-extrabold text-slate-900">Connect with Kabir</h2>
+                <h2 className="text-base font-extrabold text-slate-900">Connect with Kavya</h2>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
-              <p className="text-xs text-slate-500">Mahindra AI Showroom Specialist</p>
+              <p className="text-xs text-slate-500">AI Showroom Specialist</p>
             </div>
           </div>
           <button
@@ -142,7 +142,7 @@ export function CustomerLeadModal({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs leading-relaxed">
-            Please verify your details below. Kabir will personalize your live audio & co-browsing session in real time.
+            Please verify your details below. Kavya will personalize your live audio & co-browsing session in real time.
           </div>
 
           {/* Full Name Input with Regex check */}
@@ -284,7 +284,7 @@ export function CustomerLeadModal({
             className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-40 text-white font-black py-3.5 rounded-xl transition-all shadow-md shadow-red-600/25 flex items-center justify-center gap-2 text-sm cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4" />
-            {loading ? "Verifying & Starting Kabir AI..." : "Start Live Consultation with Kabir →"}
+            {loading ? "Verifying & Starting Kavya AI..." : "Start Live Consultation with Kavya →"}
           </button>
         </form>
       </div>

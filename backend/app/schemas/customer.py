@@ -8,6 +8,7 @@ PHONE_REGEX = re.compile(r"^(\+91[\-\s]?)?[6-9]\d{9}$")
 
 class InteractionLogSchema(BaseModel):
     id: Optional[int] = None
+    brand_id: Optional[str] = "mahindra"
     session_id: Optional[int] = None
     channel: str = "VOICE_LIVE"
     speaker: str # "customer", "mia", "system"
@@ -21,6 +22,7 @@ class InteractionLogSchema(BaseModel):
 class ConversationSessionSchema(BaseModel):
     id: int
     session_id: str
+    brand_id: Optional[str] = "mahindra"
     customer_id: int
     session_type: str
     vehicle_id: str
@@ -36,6 +38,7 @@ class CustomerIdentifyRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=16)
     session_type: str = "LIVE_CALL" # "LIVE_CALL" | "CHAT_BOT"
     vehicle_id: Optional[str] = "thar_roxx"
+    brand_id: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -55,6 +58,7 @@ class CustomerIdentifyRequest(BaseModel):
 
 class CustomerProfileBase(BaseModel):
     customer_id: str
+    brand_id: Optional[str] = "mahindra"
     name: str
     phone: str
     email: Optional[str] = None

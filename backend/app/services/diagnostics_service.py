@@ -87,11 +87,15 @@ class DiagnosticsService:
             )
 
     @staticmethod
-    async def file_insurance_claim(db: AsyncSession, customer_db_id: int, req: ClaimSubmissionRequest) -> InsuranceClaim:
-        claim_id = f"MH-INS-{int(time.time()) % 100000}"
+    async def file_insurance_claim(db: AsyncSession, customer_db_id: int, req: ClaimSubmissionRequest, brand_id: Optional[str] = None) -> InsuranceClaim:
+        from app.services.brand_service import BrandService
+        b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+        active_b = BrandService.get_brand(b_id)
+        claim_id = f"{b_id.upper()[:3]}-INS-{int(time.time()) % 100000}"
         claim = InsuranceClaim(
             claim_id=claim_id,
             customer_id=customer_db_id,
+            brand_id=b_id,
             vin=req.vin,
             vehicle_model=req.vehicle_model,
             incident_description=req.incident_description,
@@ -103,7 +107,7 @@ class DiagnosticsService:
             estimated_labor_cost=800.0,
             customer_out_of_pocket=0.0,
             insurer_name="ICICI Lombard General Insurance",
-            policy_number="POL-ICICI-MH-2026-99201",
+            policy_number=f"POL-{b_id.upper()[:3]}-2026-99201",
             claim_status="DIGITALLY_APPROVED",
             workshop_name=req.workshop_name,
             parts_delivery_estimate="Tomorrow Morning 9:00 AM"

@@ -23,6 +23,7 @@ class SaveOutboundTranscriptRequest(BaseModel):
     call_reference: str
     booking_reference: Optional[str] = None
     customer_id: Optional[str] = None
+    brand_id: Optional[str] = None
     phone_number: Optional[str] = None
     customer_name: Optional[str] = None
     vehicle_name: Optional[str] = None
@@ -34,14 +35,18 @@ async def trigger_outbound_call(
     req: OutboundCallTriggerRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Triggers proactive outbound voice call from MIA to customer following test ride completion."""
+    """Triggers proactive outbound voice call to customer following test ride completion."""
     call = await OutboundCallService.trigger_outbound_call(db, req)
+    b_id = (req.brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+    active_b = BrandService.get_brand(b_id)
+    caller_agent = f"{active_b.name if active_b else b_id.title()} Concierge (+91 22 6900 1000)"
     return {
         "status": "CALL_INITIATED",
         "call_reference": call.call_reference,
+        "brand_id": b_id,
         "customer_id": req.customer_id,
         "phone_number": req.phone_number,
-        "caller_id": "MIA (+91 22 6900 1000)",
+        "caller_id": caller_agent,
         "message": f"Calling {req.customer_name} regarding their {req.vehicle_name} test drive experience."
     }
 
@@ -59,25 +64,31 @@ async def save_outbound_call_transcript(
     db: AsyncSession = Depends(get_db)
 ):
     """Saves completed outbound feedback call transcript turns directly into OutboundCallLog for the Admin Console."""
+    from app.services.brand_service import BrandService
+    b_id = (req.brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+    active_b = BrandService.get_brand(b_id)
+    brand_display = active_b.name if active_b else b_id.title()
+
     customer = None
     if req.phone_number:
         clean_p = req.phone_number.replace(" ", "").replace("-", "")
-        c_res = await db.execute(select(Customer).where(Customer.phone.contains(clean_p[-10:])))
+        c_res = await db.execute(select(Customer).where(Customer.phone.contains(clean_p[-10:]), Customer.brand_id == b_id))
         customer = c_res.scalars().first()
 
     if not customer and req.customer_id:
-        c_res = await db.execute(select(Customer).where((Customer.customer_id == req.customer_id) | (Customer.id == 2)))
+        c_res = await db.execute(select(Customer).where((Customer.customer_id == req.customer_id) & (Customer.brand_id == b_id)))
         customer = c_res.scalars().first()
 
     if not customer:
-        c_res = await db.execute(select(Customer).limit(1))
+        c_res = await db.execute(select(Customer).where(Customer.brand_id == b_id).limit(1))
         customer = c_res.scalars().first()
 
     cust_id = customer.id if customer else 2
 
     formatted_lines = []
+    agent_label = f"{brand_display} AI"
     for t in req.turns:
-        spk = t.get("speaker") or ("Kavya AI" if t.get("role") == "ai" else "Customer")
+        spk = t.get("speaker") or (agent_label if t.get("role") == "ai" else "Customer")
         txt = t.get("text") or t.get("message") or ""
         tm = t.get("time") or "00:00"
         if txt.strip():
@@ -85,32 +96,36 @@ async def save_outbound_call_transcript(
 
     if not formatted_lines:
         c_name = customer.name if customer else (req.customer_name or "Valued Customer")
-        v_name = req.vehicle_name or "Mahindra SUV"
-        formatted_lines.append(f'[00:02] Kavya AI: "Namaste {c_name} ji! Main Mahindra se Kavya baat kar rahi hoon. Aapka {v_name} ka test drive kaisa raha?"')
+        v_name = req.vehicle_name or f"{brand_display} Vehicle"
+        formatted_lines.append(f'[00:02] {agent_label}: "Namaste {c_name} ji! Main {brand_display} se baat kar rahi hoon. Aapka {v_name} ka test drive kaisa raha?"')
 
     full_transcript = "\n".join(formatted_lines)
 
     stmt = select(OutboundCallLog).where(
         (OutboundCallLog.call_reference == req.call_reference) |
-        (OutboundCallLog.customer_id == cust_id)
+        ((OutboundCallLog.customer_id == cust_id) & (OutboundCallLog.brand_id == b_id))
     ).order_by(OutboundCallLog.created_at.desc())
     res = await db.execute(stmt)
     call_log = res.scalars().first()
 
+    def_veh = req.vehicle_name or (f"{brand_display} Flagship Model")
+
     if call_log:
+        call_log.brand_id = b_id
         call_log.transcript = full_transcript
         call_log.call_status = "COMPLETED"
         call_log.call_duration_seconds = req.duration_seconds or max(35, len(req.turns) * 12)
         call_log.customer_sentiment = "VERY_POSITIVE"
         call_log.customer_decision = "CONFIRMED_FAST_TRACK"
         call_log.objection_resolution_status = "100% RESOLVED (Test Drive Feedback & Fast-Track Priority Allocation Locked)"
-        call_log.locked_vehicle_variant = req.vehicle_name or "Mahindra XUV700 AX7L Diesel AWD"
+        call_log.locked_vehicle_variant = def_veh
         call_log.locked_allocation_days = 12
     else:
         call_log = OutboundCallLog(
-            call_reference=req.call_reference or f"CALL-MIA-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}",
+            call_reference=req.call_reference or f"CALL-{b_id.upper()[:4]}-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}",
             customer_id=cust_id,
-            agent_name="Kavya AI (Mahindra Post-Ride Specialist)",
+            brand_id=b_id,
+            agent_name=f"{brand_display} Client Experience Specialist",
             phone_number=req.phone_number or "+91 98196 57034",
             call_status="COMPLETED",
             call_duration_seconds=req.duration_seconds or 45,
@@ -118,7 +133,7 @@ async def save_outbound_call_transcript(
             objection_resolution_status="100% RESOLVED (Test Drive Feedback & Fast-Track Priority Allocation Locked)",
             customer_sentiment="VERY_POSITIVE",
             customer_decision="CONFIRMED_FAST_TRACK",
-            locked_vehicle_variant=req.vehicle_name or "Mahindra XUV700 AX7L Diesel AWD",
+            locked_vehicle_variant=def_veh,
             locked_allocation_days=12,
             next_step="PRIORITY_ALLOCATION_DISPATCH"
         )

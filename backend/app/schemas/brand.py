@@ -43,7 +43,7 @@ class BrandSummary(BaseModel):
 
 class BrandOnboardRequest(BaseModel):
     brand_name: str
-    urls: List[str]
+    urls: Optional[List[str]] = Field(default_factory=list)
 
 class VehicleUpdateRequest(BaseModel):
     name: Optional[str] = None

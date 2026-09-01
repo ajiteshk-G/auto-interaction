@@ -58,7 +58,7 @@ export function LiveAudioControls({
       <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-red-600" />
-          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Live Chat with Kabir</span>
+          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Live Chat with Kavya</span>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -89,7 +89,7 @@ export function LiveAudioControls({
               <div className={`flex items-center justify-between gap-2 mb-1 text-[10px] ${
                 msg.speaker === "customer" ? "text-red-100" : "text-slate-400"
               }`}>
-                <span className="font-bold">{msg.speaker === "customer" ? "You" : "Kabir (Mahindra Showroom Specialist)"}</span>
+                <span className="font-bold">{msg.speaker === "customer" ? "You" : "Kavya (AI Showroom Specialist)"}</span>
                 <span>{msg.timestamp}</span>
               </div>
               <p className="leading-relaxed whitespace-pre-wrap font-medium">{msg.text}</p>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120" width="500" height="120">
+  <defs>
+    <linearGradient id="mhd-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E11D48"/>
+      <stop offset="100%" stop-color="#BE123C"/>
+    </linearGradient>
+    <linearGradient id="chrome-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#64748B"/>
+    </linearGradient>
+  </defs>
+  <!-- Mahindra Twin Peaks Monogram -->
+  <g transform="translate(10, 10)">
+    <!-- Left Wing -->
+    <path d="M 45 10 L 15 90 L 35 90 L 58 35 L 55 90 L 72 90 L 75 10 Z" fill="url(#chrome-grad)" />
+    <!-- Right Wing -->
+    <path d="M 85 10 L 115 90 L 95 90 L 72 35 L 75 90 L 58 90 L 55 10 Z" fill="url(#chrome-grad)" opacity="0.9" />
+    <path d="M 45 10 L 65 55 L 72 35 L 58 10 Z" fill="#E11D48" />
+    <path d="M 85 10 L 65 55 L 58 35 L 72 10 Z" fill="#BE123C" />
+  </g>
+  <!-- Brand Name Typography -->
+  <text x="145" y="68" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="900" letter-spacing="6" fill="#0F172A">MAHINDRA</text>
+  <text x="148" y="92" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" letter-spacing="8" fill="#E11D48">RISE WITH PURPOSE</text>
+</svg>

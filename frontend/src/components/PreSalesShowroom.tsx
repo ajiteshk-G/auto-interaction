@@ -57,13 +57,7 @@ export function PreSalesShowroom({
   // Dynamic brand identities
   const brandName = brand?.name ? brand.name.replace(/\(.*\)/, "").trim() : "Mahindra";
   const primaryColor = brand?.primary_color || "#d71920";
-  const agentName =
-    brand?.agent_name ||
-    (brandName.toLowerCase().includes("hyundai")
-      ? "Aarav"
-      : brandName.toLowerCase().includes("maruti")
-      ? "Rohan"
-      : "Kabir");
+  const agentName = brand?.agent_name || brand?.avatar_name || "Kavya";
 
   // Layout mode: "carousel" (like reference app) or "grid"
   const [viewMode, setViewMode] = useState<"carousel" | "grid">("carousel");
@@ -104,13 +98,21 @@ export function PreSalesShowroom({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Auto-scroll the vehicle carousel to keep the active vehicle centered
+  // Auto-scroll the vehicle carousel to keep the active vehicle centered, auto-resetting category if needed
   useEffect(() => {
-    const card = document.getElementById(`carousel-card-${selectedVehicleId}`);
-    if (card && carouselRef.current) {
-      card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (!selectedVehicleId) return;
+    const veh = vehicles.find((v) => v.id === selectedVehicleId);
+    if (veh && selectedCategory !== "ALL" && veh.category !== selectedCategory) {
+      setSelectedCategory("ALL");
     }
-  }, [selectedVehicleId]);
+    const timer = setTimeout(() => {
+      const card = document.getElementById(`carousel-card-${selectedVehicleId}`);
+      if (card && carouselRef.current) {
+        card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [selectedVehicleId, vehicles, selectedCategory]);
 
   // Compute categories dynamically from vehicles
   const categories = React.useMemo(() => {
@@ -208,6 +210,11 @@ export function PreSalesShowroom({
                 src={currentVehicle.hero_image}
                 alt={currentVehicle.name}
                 className="max-h-full max-w-full object-contain"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/assets/placeholder-car.svg";
+                }}
               />
             </div>
             <div>
@@ -398,6 +405,11 @@ export function PreSalesShowroom({
                 src={currentVehicle.hero_image}
                 alt={currentVehicle.name}
                 className="max-h-full max-w-full object-contain filter drop-shadow-2xl transition-all duration-500 hover:scale-105"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/assets/placeholder-car.svg";
+                }}
               />
             </div>
 
@@ -527,19 +539,31 @@ export function PreSalesShowroom({
                           onSendChatMessage(`Tell me about ${vehicle.name}`);
                         }
                       }}
-                      className={`min-w-[240px] max-w-[260px] rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden border p-3.5 flex flex-col justify-between group bg-white shadow-xs shrink-0 snap-start ${
+                      className={`min-w-[240px] max-w-[260px] rounded-2xl transition-all duration-300 cursor-pointer overflow-hidden border p-3.5 flex flex-col justify-between group bg-white shrink-0 snap-start ${
                         isSelected
-                          ? isEV
-                            ? "border-cyan-500 ring-2 ring-cyan-500/20 shadow-md bg-cyan-50/20"
-                            : "border-slate-800 ring-2 ring-slate-400 shadow-md bg-slate-50/50"
+                          ? "ring-4 shadow-xl scale-[1.03] z-10"
                           : "border-slate-200 hover:border-slate-300 hover:shadow-md"
                       }`}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: primaryColor,
+                              boxShadow: `0 12px 28px -6px ${primaryColor}40`,
+                              backgroundColor: `${primaryColor}08`
+                            }
+                          : {}
+                      }
                     >
                       <div className="relative h-28 w-full bg-slate-50 flex items-center justify-center p-2 rounded-xl mb-2">
                         <img
                           src={vehicle.hero_image}
                           alt={vehicle.name}
                           className="w-full h-full object-contain filter drop-shadow-sm group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/assets/placeholder-car.svg";
+                          }}
                         />
                         {vehicle.is_custom_source_of_truth && (
                           <span className="absolute top-2 left-2 bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase shadow-xs">
@@ -548,10 +572,11 @@ export function PreSalesShowroom({
                         )}
                         {isSelected && (
                           <span
-                            className="absolute top-2 right-2 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-xs"
+                            className="absolute top-2 right-2 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase shadow-md flex items-center gap-1.5 animate-pulse"
                             style={{ backgroundColor: primaryColor }}
                           >
-                            Active
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            Focused
                           </span>
                         )}
                       </div>
@@ -618,6 +643,11 @@ export function PreSalesShowroom({
                           src={vehicle.hero_image}
                           alt={vehicle.name}
                           className="w-full h-full object-contain filter drop-shadow-sm group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/assets/placeholder-car.svg";
+                          }}
                         />
                         {vehicle.is_custom_source_of_truth && (
                           <span className="absolute top-2 left-2 bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase shadow-xs">

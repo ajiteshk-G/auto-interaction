@@ -6,6 +6,7 @@ class TestDriveBookingCreate(BaseModel):
     customer_id: Optional[str] = "CUST-9820155432"
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
+    brand_id: Optional[str] = None
     vehicle_id: str = "thar_roxx"
     variant: str = "AX7L Diesel AT 4x4"
     color: Optional[str] = "Stealth Black"
@@ -16,11 +17,11 @@ class TestDriveBookingCreate(BaseModel):
     scheduled_time_slot: str
     notes: Optional[str] = None
     advisor_checklist: Optional[list[str]] = None
-    advisor_checklist: Optional[list[str]] = None
 
 class TestDriveBookingResponse(BaseModel):
     id: int
     booking_reference: str
+    brand_id: Optional[str] = "mahindra"
     customer_id: int
     vehicle_id: str
     variant: str
@@ -70,6 +71,7 @@ class SlotReserveRequest(BaseModel):
     customer_id: Optional[str] = None
     customer_name: str
     customer_phone: str
+    brand_id: Optional[str] = None
     vehicle_id: str = "thar_roxx"
     variant: Optional[str] = "AX7L Diesel AT 4x4"
     color: Optional[str] = "Stealth Black"

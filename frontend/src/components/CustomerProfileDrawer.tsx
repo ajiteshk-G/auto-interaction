@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { CustomerProfile } from "@/types";
+import { CustomerProfile, BrandCatalog } from "@/types";
 import { X, User, Phone, Mail, MapPin, ShieldCheck, Car, CreditCard, Sparkles, Clock, RefreshCw } from "lucide-react";
 
 interface CustomerProfileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   profile: CustomerProfile | null;
+  brand?: BrandCatalog | null;
   onSetPhase: (phase: "PRE_SALES" | "FINANCING" | "PURCHASED" | "POST_SALES") => void;
   onRefresh: () => void;
 }
@@ -16,10 +17,14 @@ export function CustomerProfileDrawer({
   isOpen,
   onClose,
   profile,
+  brand,
   onSetPhase,
   onRefresh
 }: CustomerProfileDrawerProps) {
   if (!isOpen || !profile) return null;
+
+  const brandColor = brand?.primary_color || "#e31837";
+  const brandName = brand?.name || "Official Auto";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex justify-end">
@@ -27,8 +32,15 @@ export function CustomerProfileDrawer({
         {/* Drawer Header */}
         <div className="p-4 border-b border-mahindra-border flex items-center justify-between sticky top-0 bg-mahindra-card z-10">
           <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-mahindra-red" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Persistent Customer Profile</h2>
+            <User className="w-5 h-5" style={{ color: brandColor }} />
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                {brand?.name ? `${brand.name} Profile` : "Persistent Customer Profile"}
+              </h2>
+              {brand?.id && (
+                <span className="text-[10px] text-gray-400 font-mono">Brand Tenant: {brand.id}</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onRefresh} className="p-1 text-gray-400 hover:text-white rounded">

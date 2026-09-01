@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     # REST Chat Model (Standard GenerateContent)
     REST_CHAT_MODEL: str = os.getenv("REST_CHAT_MODEL", "gemini-2.5-flash")
     
-    AVATAR_VOICE: str = os.getenv("AVATAR_VOICE", "Puck") # Voice for Kabir
-    AVATAR_NAME: str = os.getenv("AVATAR_NAME", "Kabir")
+    AVATAR_VOICE: str = os.getenv("AVATAR_VOICE", "Aoede") # Voice for Kavya (Female Indian AI Specialist)
+    AVATAR_NAME: str = os.getenv("AVATAR_NAME", "Kavya")
     AVATAR_MODALITY: str = os.getenv("AVATAR_MODALITY", "AUDIO") # Real-time native live audio stream
     DEFAULT_LOCALE: str = os.getenv("DEFAULT_LOCALE", "hi-IN") # Multilingual
     

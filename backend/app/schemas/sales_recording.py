@@ -14,6 +14,7 @@ class TestRideRecordingUploadRequest(BaseModel):
     customer_id: str = Field(..., description="Customer ID")
     booking_reference: Optional[str] = Field(None, description="Booking reference, e.g. BK-MAH-16859")
     customer_name: Optional[str] = Field(None, description="Customer Name")
+    brand_id: Optional[str] = Field(None, description="Brand identifier, e.g. bmw, hyundai, maruti_suzuki, mahindra")
     vehicle_id: str = Field(default="thar_roxx")
     variant: str = Field(default="AX7L Diesel AT 4x4")
     sales_advisor_name: str = Field(default="Rajesh Varma (Bayview Mahindra)")
@@ -27,6 +28,7 @@ class TestRideInsightResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     session_id: str
+    brand_id: Optional[str] = "mahindra"
     booking_reference: Optional[str] = None
     customer_id: Union[str, int]
     vehicle_id: str
@@ -49,6 +51,7 @@ class TestRideInsightResponse(BaseModel):
 
 class TestRideLeadItem(BaseModel):
     customer_id: str
+    brand_id: Optional[str] = "mahindra"
     name: str
     phone: str
     email: Optional[str] = None

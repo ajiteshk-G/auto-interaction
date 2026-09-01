@@ -17,6 +17,8 @@ from app.services.customer_service import clean_phone
 
 logger = logging.getLogger(__name__)
 
+from app.services.brand_service import BrandService
+
 router = APIRouter(prefix="/admin", tags=["Admin Portal"])
 
 
@@ -27,6 +29,7 @@ async def get_admin_bookings(
     status: Optional[str] = Query(None, description="Filter by booking status"),
     phone: Optional[str] = Query(None, description="Search by customer phone"),
     search: Optional[str] = Query(None, description="Search across name, phone, ref, car"),
+    brand_id: Optional[str] = Query(None, description="Filter by brand ID (mahindra, bmw, hyundai, maruti_suzuki, etc.)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -35,21 +38,36 @@ async def get_admin_bookings(
     1. Pre-Sales Transcript (Chat/Voice with Kabir in Showroom)
     2. Test Ride Transcript (In-Vehicle Test Drive with Sales Advisor)
     """
-    # 1. Bulk prefetch all data in 5 bulk queries to avoid N+1 DB latency
-    dealer_res = await db.execute(select(Dealership))
-    b_res = await db.execute(
+    b_id = brand_id.lower() if brand_id else None
+
+    # 1. Bulk prefetch all data in 5 bulk queries to avoid N+1 DB latency, scoped to brand
+    dealer_stmt = select(Dealership)
+    b_stmt = (
         select(TestDriveBooking)
         .options(selectinload(TestDriveBooking.customer))
         .order_by(desc(TestDriveBooking.created_at))
     )
-    tr_res = await db.execute(select(TestRideRecording).order_by(desc(TestRideRecording.created_at)))
-    out_res = await db.execute(select(OutboundCallLog).order_by(desc(OutboundCallLog.created_at)))
-    logs_res = await db.execute(
+    tr_stmt = select(TestRideRecording).order_by(desc(TestRideRecording.created_at))
+    out_stmt = select(OutboundCallLog).order_by(desc(OutboundCallLog.created_at))
+    logs_stmt = (
         select(InteractionLog)
         .options(selectinload(InteractionLog.session))
         .where(InteractionLog.channel != "TEST_RIDE_IN_VEHICLE")
         .order_by(InteractionLog.created_at.asc())
     )
+
+    if b_id:
+        dealer_stmt = dealer_stmt.where(Dealership.brand_id == b_id)
+        b_stmt = b_stmt.where(TestDriveBooking.brand_id == b_id)
+        tr_stmt = tr_stmt.where(TestRideRecording.brand_id == b_id)
+        out_stmt = out_stmt.where(OutboundCallLog.brand_id == b_id)
+        logs_stmt = logs_stmt.where(InteractionLog.brand_id == b_id)
+
+    dealer_res = await db.execute(dealer_stmt)
+    b_res = await db.execute(b_stmt)
+    tr_res = await db.execute(tr_stmt)
+    out_res = await db.execute(out_stmt)
+    logs_res = await db.execute(logs_stmt)
 
     dealers = dealer_res.scalars().all()
     bookings = b_res.scalars().all()
@@ -259,6 +277,7 @@ async def get_admin_bookings(
         record = {
             "booking_id": b.id,
             "booking_reference": b.booking_reference,
+            "brand_id": getattr(b, "brand_id", "mahindra"),
             "customer_id": cust.customer_id if cust else f"CUST-{b.customer_id}",
             "customer_name": cust_name,
             "customer_phone": cust_phone,
@@ -295,11 +314,15 @@ async def get_admin_bookings(
         admin_records.append(record)
 
     # Process all other registered showroom leads / customers without a finalized test drive slot yet
-    all_cust_res = await db.execute(
+    cust_stmt = (
         select(Customer)
         .options(selectinload(Customer.interactions).selectinload(InteractionLog.session))
         .order_by(desc(Customer.updated_at))
     )
+    if b_id:
+        cust_stmt = cust_stmt.where(Customer.brand_id == b_id)
+
+    all_cust_res = await db.execute(cust_stmt)
     all_customers = all_cust_res.scalars().all()
 
     for c in all_customers:
@@ -308,7 +331,14 @@ async def get_admin_bookings(
             continue
         seen_customer_phones.add(norm_p)
 
-        veh_id = c.interested_vehicle_id or "thar_roxx"
+        c_brand_id = c.brand_id or b_id or "mahindra"
+        active_b = BrandService.get_brand(c_brand_id)
+        brand_disp = active_b.name if active_b else c_brand_id.title()
+        def_dlr_id = active_b.dealerships[0].id if active_b and active_b.dealerships else f"{c_brand_id}_flagship"
+        def_dlr_name = active_b.dealerships[0].name if active_b and active_b.dealerships else f"{brand_disp} Showroom"
+        def_adv_name = f"{brand_disp} AI Specialist"
+
+        veh_id = c.interested_vehicle_id or ("bmw_x5" if c_brand_id == "bmw" else "creta" if c_brand_id == "hyundai" else "grand_vitara" if c_brand_id == "maruti_suzuki" else "thar_roxx")
         v_info = CatalogService.get_vehicle_by_id(veh_id)
         veh_name = v_info.name if v_info else veh_id.replace("_", " ").title()
 
@@ -317,7 +347,7 @@ async def get_admin_bookings(
         for log in sorted(c.interactions, key=lambda x: x.created_at or datetime.min):
             if log.channel == "TEST_RIDE_IN_VEHICLE":
                 continue
-            speaker_label = "Customer" if log.speaker == "customer" else "Kabir (AI Specialist)"
+            speaker_label = "Customer" if log.speaker == "customer" else f"{brand_disp} AI Specialist"
             dt = log.created_at
             sess = log.session
             sess_uid = sess.session_id if sess else f"SESS-{dt.strftime('%Y%m%d-%H%M') if dt else 'SHOWROOM'}"
@@ -345,16 +375,17 @@ async def get_admin_bookings(
             "booking_id": None,
             "booking_reference": f"LEAD-{c.customer_id.replace('CUST-', '')}",
             "customer_id": c.customer_id,
+            "brand_id": c_brand_id,
             "customer_name": c.name,
             "customer_phone": c.phone,
             "customer_city": c.city or "Mumbai",
             "vehicle_id": veh_id,
             "vehicle_name": veh_name,
-            "variant": c.interested_variant or "AX7L Diesel AT 4x4",
-            "color": "Stealth Black",
-            "dealership_id": "BAYVIEW-MUM-01",
-            "dealership_name": "Bayview Mahindra, Bandra West, Mumbai",
-            "sales_advisor_name": "Kabir (AI Specialist)",
+            "variant": c.interested_variant or "Official Variant",
+            "color": "Metallic Finish",
+            "dealership_id": def_dlr_id,
+            "dealership_name": def_dlr_name,
+            "sales_advisor_name": def_adv_name,
             "booking_type": "SHOWROOM_VISIT",
             "delivery_address": "Showroom Consultation",
             "scheduled_date": "Slot Pending",

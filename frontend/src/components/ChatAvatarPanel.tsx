@@ -69,13 +69,7 @@ export function ChatAvatarPanel({
   // Dynamic brand identities
   const brandName = brand?.name ? brand.name.replace(/\(.*\)/, "").trim() : "Mahindra";
   const primaryColor = brand?.primary_color || "#d71920";
-  const agentName =
-    brand?.agent_name ||
-    (brandName.toLowerCase().includes("hyundai")
-      ? "Aarav"
-      : brandName.toLowerCase().includes("maruti")
-      ? "Rohan"
-      : "Kabir");
+  const agentName = brand?.agent_name || brand?.avatar_name || "Kavya";
 
   useEffect(() => {
     if (initialCustomerName && initialCustomerPhone) {

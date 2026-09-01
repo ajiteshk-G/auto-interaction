@@ -16,22 +16,29 @@ from app.schemas.outbound_call import (
 )
 from app.config import settings
 
+from app.services.brand_service import BrandService
+
 logger = logging.getLogger("outbound_call_service")
 
 class OutboundCallService:
     @staticmethod
     async def trigger_outbound_call(db: AsyncSession, req: OutboundCallTriggerRequest) -> OutboundCallLog:
-        # Find customer
-        stmt = select(Customer).where(Customer.customer_id == req.customer_id)
+        b_id = (req.brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+        active_brand = BrandService.get_brand(b_id)
+        brand_name = active_brand.name if active_brand else b_id.title()
+
+        # Find customer scoped by brand_id
+        stmt = select(Customer).where((Customer.customer_id == req.customer_id) & (Customer.brand_id == b_id))
         res = await db.execute(stmt)
         customer = res.scalars().first()
         if not customer:
-            stmt_all = select(Customer).limit(1)
+            stmt_all = select(Customer).where(Customer.brand_id == b_id).limit(1)
             res_all = await db.execute(stmt_all)
             customer = res_all.scalars().first()
             if not customer:
                 customer = Customer(
                     customer_id=req.customer_id,
+                    brand_id=b_id,
                     name=req.customer_name,
                     phone=req.phone_number,
                     city="Mumbai",
@@ -43,28 +50,36 @@ class OutboundCallService:
         # Find associated TestRideRecording for in-vehicle context
         tr_rec: Optional[TestRideRecording] = None
         if req.booking_reference:
-            b_stmt = select(TestRideRecording).where(TestRideRecording.booking_reference == req.booking_reference).order_by(TestRideRecording.created_at.desc())
+            b_stmt = select(TestRideRecording).where(
+                (TestRideRecording.booking_reference == req.booking_reference) &
+                (TestRideRecording.brand_id == b_id)
+            ).order_by(TestRideRecording.created_at.desc())
             b_res = await db.execute(b_stmt)
             tr_rec = b_res.scalars().first()
 
         if not tr_rec and customer:
-            c_stmt = select(TestRideRecording).where(TestRideRecording.customer_id == customer.id).order_by(TestRideRecording.created_at.desc())
+            c_stmt = select(TestRideRecording).where(
+                (TestRideRecording.customer_id == customer.id) &
+                (TestRideRecording.brand_id == b_id)
+            ).order_by(TestRideRecording.created_at.desc())
             c_res = await db.execute(c_stmt)
             tr_rec = c_res.scalars().first()
 
-        veh_name = req.vehicle_name or (tr_rec.vehicle_name if tr_rec else "Mahindra SUV")
+        default_veh = f"{brand_name} Premium Line"
+        veh_name = req.vehicle_name or (tr_rec.vehicle_name if tr_rec else default_veh)
         advisor_name = req.advisor_name or (tr_rec.sales_advisor_name if tr_rec else "Rajesh Varma")
         advisor_short = advisor_name.split(" ")[0].replace("Specialist", "").strip("()") or "Rajesh"
         cust_name = req.customer_name or customer.name or "Valued Customer"
 
-        call_ref = f"CALL-MIA-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        call_ref = f"CALL-{b_id.upper()[:4]}-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
 
-        initial_greeting = f'Namaste {cust_name} ji! Main Mahindra se MIA baat kar rahi hoon. Aapka {veh_name} ka test drive kaisa raha? Kya hamare Sales Consultant {advisor_short} ji ne aapke sabhi sawalon ka achhi tarah jawab diya?'
+        agent_display_name = f"{brand_name} AI (Post-Ride Concierge)"
 
         call_log = OutboundCallLog(
             call_reference=call_ref,
             customer_id=customer.id,
-            agent_name="MIA (Mahindra Intelligent Assistant)",
+            brand_id=b_id,
+            agent_name=agent_display_name,
             phone_number=req.phone_number,
             call_status="IN_PROGRESS",
             call_duration_seconds=0,
@@ -101,25 +116,40 @@ class OutboundCallService:
         loved_features = ["FSD Suspension", "Panoramic Skyroof", "Engine Pickup"]
         objections = ["Delivery Waiting Period", "Flexible EMI"]
 
+        b_id = (call_log.brand_id if call_log and call_log.brand_id else (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+        active_brand = BrandService.get_brand(b_id)
+        brand_name = active_brand.name if active_brand else b_id.title()
+
+        # Lookup customer & test ride context
+        cust_name = "Customer"
+        veh_name = f"{brand_name} Model"
+        advisor_short = "Advisor"
+        tr_transcript = ""
+        loved_features = ["Driving Dynamics", "Cabin Comfort", "Engine Pickup"]
+        objections = ["Delivery Waiting Period", "Flexible EMI"]
+
         if call_log:
-            c_stmt = select(Customer).where(Customer.id == call_log.customer_id)
+            c_stmt = select(Customer).where((Customer.id == call_log.customer_id) & (Customer.brand_id == b_id))
             c_res = await db.execute(c_stmt)
             cust = c_res.scalars().first()
             if cust:
                 cust_name = cust.name
 
             # Lookup test ride recording
-            tr_stmt = select(TestRideRecording).where(TestRideRecording.customer_id == call_log.customer_id).order_by(TestRideRecording.created_at.desc())
+            tr_stmt = select(TestRideRecording).where(
+                (TestRideRecording.customer_id == call_log.customer_id) &
+                (TestRideRecording.brand_id == b_id)
+            ).order_by(TestRideRecording.created_at.desc())
             tr_res = await db.execute(tr_stmt)
             tr = tr_res.scalars().first()
             if tr:
                 veh_name = tr.vehicle_name or veh_name
-                advisor_short = (tr.sales_advisor_name or "Rajesh").split(" ")[0].replace("Specialist", "").strip("()") or "Rajesh"
+                advisor_short = (tr.sales_advisor_name or "Advisor").split(" ")[0].replace("Specialist", "").strip("()") or "Advisor"
                 tr_transcript = tr.transcript or ""
                 loved_features = tr.loved_features or loved_features
                 objections = tr.objections_raised or objections
 
-        # Generate dynamic response via Gemini with strict Mahindra domain guardrails
+        # Generate dynamic response via Gemini with strict brand domain guardrails
         agent_reply = ""
         try:
             from google import genai
@@ -127,7 +157,7 @@ class OutboundCallService:
 
             client = genai.Client(vertexai=True, project=settings.VERTEX_PROJECT_ID, location=settings.VERTEX_LOCATION)
             
-            system_prompt = f"""You are MIA, an expert, polite, and attentive Post-Test Ride Customer Relationship Specialist from Mahindra Auto.
+            system_prompt = f"""You are {brand_name} AI, an expert, polite, and attentive Post-Test Ride Customer Relationship Specialist from {brand_name}.
 You are in a live feedback phone call with {cust_name}, who recently completed a test drive of the {veh_name} with Sales Consultant {advisor_short}.
 
 *** IN-VEHICLE TEST RIDE CONTEXT ***
@@ -143,10 +173,10 @@ Objections / Questions Raised: {", ".join(objections)}
 3. Offer to lock their preferred vehicle allocation and send digital financing / booking confirmation.
 
 *** STRICT DOMAIN & SCOPE BOUNDARY (MANDATORY RULE) ***
-1. YOU MUST NEVER ANSWER ANY QUESTION OUTSIDE MAHINDRA VEHICLES, MAHINDRA TEST DRIVES, VEHICLE BOOKING, OR MAHINDRA FINANCE.
-2. If the user asks about ANY competitor cars (Tata, Kia, Hyundai, Toyota, etc.) or unrelated topics (cooking, news, coding, weather):
-   - Politely decline and steer the conversation strictly back to their Mahindra {veh_name} test drive and feedback.
-   - Example: "Main keval Mahindra gaadiyon aur aapke test drive experience ke baare mein baat kar sakti hoon."
+1. YOU MUST NEVER ANSWER ANY QUESTION OUTSIDE {brand_name.upper()} VEHICLES, TEST DRIVES, VEHICLE BOOKING, OR OFFICIAL FINANCING.
+2. If the user asks about competitor cars or unrelated topics:
+   - Politely decline and steer the conversation strictly back to their {brand_name} {veh_name} test drive and feedback.
+   - Example: "Main keval {brand_name} gaadiyon aur aapke test drive experience ke baare mein baat kar sakti hoon."
 3. Respond in conversational Hindi/Hinglish, natural, polite, and concise (under 30 words per turn)."""
 
             config = types.GenerateContentConfig(
@@ -187,10 +217,11 @@ Objections / Questions Raised: {", ".join(objections)}
         is_finished = "shukriya" in agent_reply.lower() or "thank" in agent_reply.lower() or turn_idx >= 4
 
         # Update call log transcript
+        agent_tag = f"{brand_name} AI"
         if call_log:
             now_sec = (turn_idx * 15) + 12
             call_log.call_duration_seconds = now_sec
-            call_log.transcript = (call_log.transcript or "") + f'\n[00:{now_sec:02d}] Customer: "{user_speech}"\n[00:{now_sec+5:02d}] MIA: "{agent_reply}"'
+            call_log.transcript = (call_log.transcript or "") + f'\n[00:{now_sec:02d}] Customer: "{user_speech}"\n[00:{now_sec+5:02d}] {agent_tag}: "{agent_reply}"'
             if is_finished:
                 call_log.call_status = "COMPLETED"
                 call_log.objection_resolution_status = "100% RESOLVED (Allocation Locked)"
@@ -199,7 +230,7 @@ Objections / Questions Raised: {", ".join(objections)}
 
         return OutboundDialogueTurnResponse(
             call_reference=req.call_reference,
-            speaker="MIA",
+            speaker=agent_tag,
             agent_message=agent_reply,
             ai_reply=agent_reply,
             is_call_finished=is_finished,
@@ -222,8 +253,9 @@ Objections / Questions Raised: {", ".join(objections)}
 
         return OutboundCallInsightsResponse(
             call_reference=call.call_reference,
-            customer_id=cust.customer_id if cust else "CUST-AARAV-001",
-            customer_name=cust.name if cust else "Aarav Sharma",
+            brand_id=call.brand_id,
+            customer_id=cust.customer_id if cust else "CUST-DEFAULT",
+            customer_name=cust.name if cust else "Valued Customer",
             agent_name=call.agent_name,
             phone_number=call.phone_number,
             call_status=call.call_status,
@@ -237,7 +269,7 @@ Objections / Questions Raised: {", ".join(objections)}
             objection_resolution_status=call.objection_resolution_status or "100% RESOLVED",
             customer_sentiment=call.customer_sentiment or "VERY_POSITIVE",
             customer_decision=call.customer_decision or "LOCKED_FAST_ALLOCATION",
-            locked_vehicle_variant=call.locked_vehicle_variant or "Mahindra XUV700 AX7L",
+            locked_vehicle_variant=call.locked_vehicle_variant or "Vehicle",
             locked_allocation_days=call.locked_allocation_days or 12,
             next_step=call.next_step or "DIGITAL_FINANCING_KYC",
             created_at=call.created_at

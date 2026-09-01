@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mahindra Auto — Explore SUVs & Born Electric Origins with Kabir Live Avatar",
-  description: "Official Mahindra Virtual Experience Center featuring Live AI Avatar, 3D Co-Browsing, and Real-Time Specs.",
+  title: "Automotive AI Platform — Virtual Showroom with Kavya Live AI Specialist",
+  description: "Next-generation Virtual Automotive Experience Center featuring Kavya AI Specialist, Live Audio, and Real-Time Co-Browsing.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

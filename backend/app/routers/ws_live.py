@@ -188,10 +188,15 @@ async def live_audio_websocket(websocket: WebSocket):
 
     session_mgr = get_or_create_session(session_id=session_id, customer_id=customer.customer_id)
 
-    active_b = BrandService.get_active_brand()
+    brand_param = query_params.get("brand_id")
+    active_b = (
+        BrandService.get_brand(brand_param)
+        if brand_param
+        else BrandService.get_active_brand()
+    )
     brand_name = active_b.name if active_b else "Mahindra Auto"
-    avatar_name = active_b.avatar_name if active_b else "Kabir"
-    avatar_voice = active_b.avatar_voice if active_b else "Puck"
+    avatar_name = active_b.avatar_name if active_b else "Kavya"
+    avatar_voice = active_b.avatar_voice if active_b else "Aoede"
 
     # 1. Immediate handshake to client
     await websocket.send_text(json.dumps({
@@ -205,7 +210,7 @@ async def live_audio_websocket(websocket: WebSocket):
             "name": customer.name,
             "phone": customer.phone
         },
-        "greeting": f"Namaste {customer.name}! Main {avatar_name}, {brand_name} se. Main aapki {customer.interested_vehicle_id.replace('_', ' ').title()} me madad kar sakta hoon."
+        "greeting": f"Namaste {customer.name}! Main {avatar_name}, {brand_name} se. Main aapki {customer.interested_vehicle_id.replace('_', ' ').title()} me madad kar sakti hoon."
     }))
 
     # 2. Obtain token asynchronously without blocking event loop
@@ -230,19 +235,34 @@ async def live_audio_websocket(websocket: WebSocket):
                 ping_interval=None,
                 open_timeout=4.0
             ) as bidi_ws:
-                logger.info(f"Connected to Vertex Bidi service for session {session_id}")
+                logger.info(f"Connected to Vertex Bidi service for session {session_id} (brand: {active_b.id if active_b else 'default'})")
 
-                active_system_prompt = KAVYA_OUTBOUND_PROMPT.format(
-                    cust_name=cust_name,
-                    veh_name=veh_name,
-                    advisor_name=advisor_name,
-                    lead_ref=lead_ref
-                ) if is_outbound else build_brand_system_prompt(active_b.id if active_b else None)
+                brand_outbound_prompt = f"""You are {avatar_name}, the official Proactive Post-Test Drive Experience Specialist for {brand_name}.
+You are placing an outbound phone call to the customer who recently completed a test drive.
+
+Customer Details:
+- Customer Name: {cust_name}
+- Vehicle Tested: {veh_name}
+- Senior Sales Consultant: {advisor_name}
+- Booking Reference: {lead_ref}
+
+Guidelines:
+1. Greet the customer warmly and politely in conversational Hindi/Hinglish:
+   "Namaste {cust_name} ji! Main {brand_name} se {avatar_name} baat kar rahi hoon. Aapka {veh_name} ka test drive kaisa raha? Kya hamare Sales Consultant {advisor_name} ji ne aapke sabhi sawalon ka theek se jawab diya?"
+2. Verify if the customer enjoyed the vehicle performance and if the consultant provided complete support.
+3. If the customer asks about delivery timelines or financing, resolve their concerns and offer to lock their 12-day fast-track priority allocation.
+4. STRICT GUARDRAIL: Do NOT answer anything outside the {brand_name} automotive ecosystem. If competitor cars or unrelated topics are mentioned, politely steer back to {brand_name} vehicles and their test drive.
+5. Keep your spoken responses concise, natural, polite, and under 30 words per turn for realistic phone conversation."""
+
+                active_system_prompt = brand_outbound_prompt if is_outbound else build_brand_system_prompt(active_b.id if active_b else None)
 
                 active_voice = "Aoede" if is_outbound else (avatar_voice or "Puck")
                 active_modality = "AUDIO"
 
-                # Talk to Kabir uses Gemini 2.5 Native Live Audio; Outbound call uses Gemini Live Audio
+                # Talk to AI Specialist uses Gemini 2.5 Native Live Audio; Outbound call uses Gemini Live Audio
+                brand_vehicles = active_b.vehicles if (active_b and active_b.vehicles) else []
+                cars_summary = ", ".join([f"'{v.id}' ({v.name})" for v in brand_vehicles]) if brand_vehicles else "all available lineup models"
+
                 tools_config = [
                     {
                         "functionDeclarations": [
@@ -265,13 +285,13 @@ async def live_audio_websocket(websocket: WebSocket):
                         "functionDeclarations": [
                             {
                                 "name": "switch_vehicle_showroom",
-                                "description": "Call this tool to switch the showroom backdrop, hero stage, and vehicle carousel whenever the customer asks about, compares, or mentions any Mahindra SUV or vehicle model (e.g. thar_roxx, scorpio_n, xuv700, be_6e, xev_9e, xuv_3xo, thar_3door, scorpio_classic, bolero_neo, bolero_neo_plus, bolero, xuv400_ev, marazzo).",
+                                "description": f"MANDATORY: Call this tool immediately whenever the customer asks about, compares, inquires about, or mentions any vehicle in our lineup ({cars_summary}). This switches the showroom backdrop, hero stage, and focuses the vehicle carousel directly on that car.",
                                 "parameters": {
                                     "type": "object",
                                     "properties": {
                                         "car_name": {
                                              "type": "string",
-                                             "description": "The normalized ID: thar_roxx, scorpio_n, xuv700, be_6e, xev_9e, xuv_3xo, thar_3door, scorpio_classic, bolero_neo, bolero_neo_plus, bolero, xuv400_ev, marazzo"
+                                             "description": f"The vehicle ID or model name to focus: {cars_summary}"
                                         }
                                     },
                                     "required": ["car_name"]
@@ -422,7 +442,7 @@ async def live_audio_websocket(websocket: WebSocket):
                                                 "turns": [
                                                     {
                                                         "role": "user",
-                                                        "parts": [{"text": f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as Kabir, introducing yourself as Mahindra's AI Showroom Specialist, welcoming them to the virtual showroom in {session_mgr.language}, and asking which SUV or electric vehicle they'd like to check out today."}]
+                                                        "parts": [{"text": f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as {avatar_name}, introducing yourself as {brand_name}'s female AI Showroom Specialist, welcoming them to the virtual showroom in {session_mgr.language}, and asking which vehicle or model they would like to explore today."}]
                                                     }
                                                 ],
                                                 "turnComplete": True
@@ -630,7 +650,7 @@ async def live_audio_websocket(websocket: WebSocket):
                                                 "audio_b64": data_b64,
                                                 "mime_type": mime_type or "audio/pcm;rate=24000"
                                             }))
-                                    if "text" in part:
+                                    if "text" in part and not (out_trans and out_trans.get("text")):
                                         await websocket.send_text(json.dumps({
                                             "type": "ASSISTANT_RESPONSE",
                                             "speaker": "mia",
@@ -670,7 +690,7 @@ async def live_audio_websocket(websocket: WebSocket):
                 msg_type = payload.get("type", "USER_CHAT")
                 if msg_type == "START_SESSION":
                     cust_name = payload.get("customer_name") or customer.name or "there"
-                    prompt = f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as Kabir, introducing yourself as Mahindra's AI Showroom Specialist, welcoming them to the showroom in {session_mgr.language}, and asking which SUV or electric vehicle they'd like to check out today."
+                    prompt = f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as {avatar_name}, introducing yourself as {brand_name}'s female AI Showroom Specialist, welcoming them to the showroom in {session_mgr.language}, and asking which vehicle or SUV they'd like to check out today."
                     result = await session_mgr.process_user_text_or_intent(prompt, lambda ev: None)
                     await websocket.send_text(json.dumps({
                         "type": "ASSISTANT_RESPONSE",

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -8,11 +8,15 @@ def utc_now():
 
 class Customer(Base):
     __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("phone", "brand_id", name="uq_customers_phone_brand"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     customer_id = Column(String(64), unique=True, index=True, nullable=False) # e.g. "CUST-9820155432"
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     name = Column(String(128), nullable=False)
-    phone = Column(String(32), unique=True, index=True, nullable=False) # Unique Phone for single customer entry
+    phone = Column(String(32), index=True, nullable=False) # Unique Phone per brand
     email = Column(String(128), nullable=True)
     city = Column(String(64), default="Mumbai")
     preferred_language = Column(String(32), default="Hinglish")
@@ -60,6 +64,7 @@ class ConversationSession(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     session_id = Column(String(64), unique=True, index=True, nullable=False) # e.g. "SESS-20260825-ABCD"
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     session_type = Column(String(32), default="LIVE_CALL") # "LIVE_CALL" | "CHAT_BOT"
     vehicle_id = Column(String(64), default="thar_roxx")
@@ -74,6 +79,7 @@ class InteractionLog(Base):
     __tablename__ = "interaction_logs"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     session_id = Column(Integer, ForeignKey("conversation_sessions.id"), nullable=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     channel = Column(String(32), default="VOICE_LIVE") # VOICE_LIVE, WHATSAPP, WEB_CHAT, DEALER_TABLET

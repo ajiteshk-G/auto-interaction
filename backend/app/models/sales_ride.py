@@ -7,6 +7,7 @@ class TestRideRecording(Base):
     __tablename__ = "test_ride_recordings"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     session_id = Column(String(64), unique=True, index=True, nullable=False) # e.g. "TR-2026-AARAV-881"
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     booking_id = Column(Integer, ForeignKey("test_drive_bookings.id"), nullable=True)
@@ -47,6 +48,7 @@ class OutboundCallLog(Base):
     __tablename__ = "outbound_call_logs"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     call_reference = Column(String(64), unique=True, index=True, nullable=False) # e.g. "CALL-MIA-2026-9901"
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     test_ride_id = Column(Integer, ForeignKey("test_ride_recordings.id"), nullable=True)

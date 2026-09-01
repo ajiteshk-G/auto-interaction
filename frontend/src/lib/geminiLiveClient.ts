@@ -15,12 +15,13 @@ export interface GeminiLiveClientOptions {
   customerPhone: string;
   vehicleName: string;
   salesAdvisorName: string;
+  brandId?: string;
   onTranscript: (turn: OutboundTurnEvent) => void;
   onCustomerSpeaking: (isSpeaking: boolean, level: number) => void;
   onAiSpeaking: (isSpeaking: boolean, level: number) => void;
   onBargeIn: () => void;
-  onError: (err: any) => void;
-  onClose: () => void;
+  onError?: (err: any) => void;
+  onClose?: () => void;
 }
 
 export class GeminiLiveClient {
@@ -56,7 +57,8 @@ export class GeminiLiveClient {
       customer_name: this.options.customerName,
       phone: this.options.customerPhone,
       vehicle_name: this.options.vehicleName,
-      advisor_name: this.options.salesAdvisorName
+      advisor_name: this.options.salesAdvisorName,
+      ...(this.options.brandId ? { brand_id: this.options.brandId } : {})
     });
 
     const wsUrl = `${protocol}//${host}/ws/live-audio?${queryParams.toString()}`;
@@ -108,17 +110,17 @@ export class GeminiLiveClient {
 
       this.socket.onerror = (err) => {
         console.warn("Gemini Live WebSocket notice:", err);
-        this.options.onError(err);
+        this.options.onError?.(err);
       };
 
       this.socket.onclose = () => {
         this.isConnected = false;
         this.stop();
-        this.options.onClose();
+        this.options.onClose?.();
       };
     } catch (err) {
       console.warn("Failed to connect Gemini Live WebSocket:", err);
-      this.options.onError(err);
+      this.options.onError?.(err);
     }
   }
 

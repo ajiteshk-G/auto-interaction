@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { CustomerProfile, OutboundCallInsightsResponse, TestRideInsightResponse } from "@/types";
+import { CustomerProfile, OutboundCallInsightsResponse, TestRideInsightResponse, BrandCatalog } from "@/types";
 import {
   Phone,
   PhoneCall,
@@ -30,7 +30,7 @@ import {
   Building2,
   ChevronRight
 } from "lucide-react";
-import { triggerOutboundCall, sendOutboundDialogueTurn, fetchAdminBookings } from "@/lib/api";
+import { triggerOutboundCall, sendOutboundDialogueTurn, fetchAdminBookings, saveOutboundCallTranscript } from "@/lib/api";
 import { GeminiLiveClient } from "@/lib/geminiLiveClient";
 
 export interface OutboundLeadItem {
@@ -55,11 +55,13 @@ const DEFAULT_COMPLETED_LEADS: OutboundLeadItem[] = [];
 interface OutboundCallSimulatorProps {
   profile?: CustomerProfile | null;
   testRideInsights?: TestRideInsightResponse | null;
+  brand?: BrandCatalog | null;
 }
 
 export function OutboundCallSimulator({
   profile,
-  testRideInsights
+  testRideInsights,
+  brand
 }: OutboundCallSimulatorProps) {
   // Leads List
   const [leads, setLeads] = useState<OutboundLeadItem[]>([]);
@@ -72,7 +74,7 @@ export function OutboundCallSimulator({
 
   // Call State
   const [callState, setCallState] = useState<"ready" | "connecting" | "in_call" | "completed">("ready");
-  const [callReference, setCallReference] = useState<string>("CALL-MIA-2026-9901");
+  const [callReference, setCallReference] = useState<string>("CALL-OUT-2026-9901");
   const [callDuration, setCallDuration] = useState<number>(0);
   const [bargeInCount, setBargeInCount] = useState<number>(0);
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
@@ -90,7 +92,7 @@ export function OutboundCallSimulator({
 
   const geminiClientRef = useRef<GeminiLiveClient | null>(null);
 
-  // Load authentic completed test drive bookings directly from Cloud SQL database
+  // Load authentic completed test drive bookings directly from Cloud SQL database scoped to active brand
   const loadData = async () => {
     setIsLoading(true);
     // Clean up any legacy sessionStorage
@@ -99,7 +101,7 @@ export function OutboundCallSimulator({
     }
 
     try {
-      const rawBookings = await fetchAdminBookings();
+      const rawBookings = await fetchAdminBookings({ brand_id: brand?.id });
       const bookingsList = Array.isArray(rawBookings) ? rawBookings : (rawBookings?.bookings || []);
       if (Array.isArray(bookingsList) && bookingsList.length > 0) {
         const completed: OutboundLeadItem[] = bookingsList
@@ -158,7 +160,7 @@ export function OutboundCallSimulator({
 
   useEffect(() => {
     loadData();
-  }, [testRideInsights]);
+  }, [testRideInsights, brand?.id]);
 
   // Duration Timer
   useEffect(() => {
@@ -207,7 +209,8 @@ export function OutboundCallSimulator({
         vehicle_name: selectedLead.vehicle_name,
         advisor_name: selectedLead.sales_advisor_name,
         booking_reference: selectedLead.booking_reference,
-        test_ride_session_id: selectedLead.session_id
+        test_ride_session_id: selectedLead.session_id,
+        brand_id: brand?.id || "mahindra"
       });
       if (resp?.call_reference) {
         setCallReference(resp.call_reference);
@@ -223,6 +226,7 @@ export function OutboundCallSimulator({
       customerPhone: selectedLead.customer_phone,
       vehicleName: selectedLead.vehicle_name,
       salesAdvisorName: selectedLead.sales_advisor_name,
+      brandId: brand?.id,
       onTranscript: (turn) => {
         if (!turn.text || !turn.text.trim()) return;
         setDialogue((prev) => {
@@ -243,29 +247,26 @@ export function OutboundCallSimulator({
                 updatedText = `${existing} ${incoming}`;
               }
 
-              const newArr = [...prev];
-              newArr[newArr.length - 1] = {
-                ...last,
-                text: updatedText
-              };
-              return newArr;
+              return [...prev.slice(0, -1), { ...last, text: updatedText }];
             }
           }
-          return [...prev, turn];
+          return [
+            ...prev,
+            {
+              speaker: turn.role === "ai" ? `${brand?.name || "Auto"} AI` : selectedLead.customer_name,
+              role: turn.role,
+              text: turn.text.trim(),
+              time: `${Math.floor(callDuration / 60)
+                .toString()
+                .padStart(2, "0")}:${(callDuration % 60).toString().padStart(2, "0")}`
+            }
+          ];
         });
       },
-      onCustomerSpeaking: (speaking) => {
-        setIsCustomerSpeaking(speaking);
-      },
-      onAiSpeaking: (speaking) => {
-        setIsAiSpeaking(speaking);
-      },
-      onBargeIn: () => {
-        setBargeInCount((prev) => prev + 1);
-      },
-      onError: (err) => {
-        console.warn("Gemini Live notice:", err);
-      },
+      onAiSpeaking: (speaking) => setIsAiSpeaking(speaking),
+      onCustomerSpeaking: (speaking) => setIsCustomerSpeaking(speaking),
+      onBargeIn: () => setBargeInCount((c) => c + 1),
+      onError: (err) => console.warn("Live notice:", err),
       onClose: () => {
         setIsAiSpeaking(false);
         setIsCustomerSpeaking(false);
@@ -276,13 +277,15 @@ export function OutboundCallSimulator({
     await client.start();
 
     setCallState("in_call");
-    const greeting = `Namaste ${selectedLead.customer_name} ji! Main Mahindra se Kavya baat kar rahi hoon. Aapka ${selectedLead.vehicle_name} ka test ride kaisa raha? Kya hamare Sales Consultant ${advisorFirstName} ji ne aapke sabhi sawalon ka theek se jawab diya?`;
 
+    const brandAgentName = brand?.agent_name || "AI Specialist";
+    const brandNameStr = brand?.name || "Official Auto";
+    const initialAiTurn = `Namaste ${selectedLead.customer_name} ji! Main ${brandNameStr} se ${brandAgentName} baat kar rahi hoon. Aapka ${selectedLead.vehicle_name} ka test drive kaisa raha?`;
     setDialogue([
       {
-        speaker: "Kavya AI",
+        speaker: `${brandAgentName}`,
         role: "ai",
-        text: greeting,
+        text: initialAiTurn,
         time: "00:02"
       }
     ]);
@@ -291,7 +294,6 @@ export function OutboundCallSimulator({
   };
 
   const handleEndCall = () => {
-
     if (geminiClientRef.current) {
       geminiClientRef.current.stop();
       geminiClientRef.current = null;
@@ -299,6 +301,21 @@ export function OutboundCallSimulator({
     setCallState("completed");
     setIsAiSpeaking(false);
     setIsCustomerSpeaking(false);
+
+    // Save outbound call transcript to backend OutboundCallLog
+    if (selectedLead && dialogue.length > 0) {
+      saveOutboundCallTranscript({
+        call_reference: callReference,
+        booking_reference: selectedLead.booking_reference,
+        customer_id: selectedLead.customer_id,
+        phone_number: selectedLead.customer_phone,
+        customer_name: selectedLead.customer_name,
+        vehicle_name: selectedLead.vehicle_name,
+        duration_seconds: callDuration || 45,
+        brand_id: brand?.id || "mahindra",
+        turns: dialogue
+      });
+    }
 
     // Mark as feedback captured in local leads state
     if (selectedLead) {
@@ -342,6 +359,7 @@ export function OutboundCallSimulator({
         customer_speech: userText,
         turn_number: turnIndex + 1,
         turn_index: turnIndex + 1,
+        brand_id: brand?.id || "mahindra",
         conversation_history: newTurns.map((t) => ({ speaker: t.speaker, text: t.text }))
       });
 

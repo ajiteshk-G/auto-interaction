@@ -2,16 +2,21 @@
 const nextConfig = {
   output: "standalone",
   reactStrictMode: false,
-  experimental: {
-    allowedDevOrigins: [
-      "*.proxy.googlers.com",
-      "*.googlers.com",
-      "localhost:3000",
-      "127.0.0.1:3000"
-    ]
-  },
   images: {
-    domains: ["images.unsplash.com", "via.placeholder.com"]
+    remotePatterns: [
+      { protocol: "https", hostname: "**" },
+      { protocol: "http", hostname: "**" }
+    ],
+    domains: [
+      "images.unsplash.com",
+      "via.placeholder.com",
+      "www.nexaexperience.com",
+      "www.marutisuzuki.com",
+      "www.hyundai.com",
+      "imgd.aeplcdn.com",
+      "www.bmw.in",
+      "www.bmw.com"
+    ]
   },
   async headers() {
     return [
@@ -30,6 +35,10 @@ const nextConfig = {
       {
         source: "/api/:path*",
         destination: "http://127.0.0.1:8000/api/:path*"
+      },
+      {
+        source: "/uploads/:path*",
+        destination: "http://127.0.0.1:8000/uploads/:path*"
       },
       {
         source: "/ws/:path*",

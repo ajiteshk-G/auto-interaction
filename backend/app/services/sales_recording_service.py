@@ -19,6 +19,7 @@ from app.schemas.sales_recording import (
 )
 from app.services.catalog_service import CatalogService
 from app.services.customer_service import clean_phone
+from app.services.brand_service import BrandService
 from app.config import settings
 
 logger = logging.getLogger("sales_recording_service")
@@ -57,17 +58,27 @@ def _create_synthetic_wav_file(filepath: str):
 
 class SalesRecordingService:
     @staticmethod
-    async def get_sales_leads(db: AsyncSession, dealership_id: Optional[str] = None) -> List[TestRideLeadItem]:
+    async def get_sales_leads(
+        db: AsyncSession,
+        dealership_id: Optional[str] = None,
+        brand_id: Optional[str] = None
+    ) -> List[TestRideLeadItem]:
         """
-        Fetch qualified leads for the Sales Mobile App with fast TTL caching.
+        Fetch qualified leads for the Sales Mobile App with fast TTL caching scoped to brand.
         Strictly 1 lead row per unique customer (identified by unique normalized phone number).
         Shows the customer's latest active test ride booking.
         """
-        cache_key = f"sales_leads_{dealership_id or 'all'}"
+        b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+        cache_key = f"sales_leads_{b_id}_{dealership_id or 'all'}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
-        booking_stmt = select(TestDriveBooking).order_by(TestDriveBooking.created_at.desc())
+            
+        booking_stmt = (
+            select(TestDriveBooking)
+            .where(TestDriveBooking.brand_id == b_id)
+            .order_by(TestDriveBooking.created_at.desc())
+        )
         if dealership_id and dealership_id.strip() and dealership_id.strip() != "ALL":
             booking_stmt = booking_stmt.where(
                 (TestDriveBooking.dealership_id == dealership_id.strip()) |
@@ -86,7 +97,10 @@ class SalesRecordingService:
             cust_res = await db.execute(select(Customer).where(Customer.id.in_(customer_ids)))
             cust_map = {c.id: c for c in cust_res.scalars().all()}
 
-        rec_res = await db.execute(select(TestRideRecording.booking_reference, TestRideRecording.customer_id))
+        rec_res = await db.execute(
+            select(TestRideRecording.booking_reference, TestRideRecording.customer_id)
+            .where(TestRideRecording.brand_id == b_id)
+        )
         existing_rec_refs = {r[0] for r in rec_res.all() if r[0]}
 
         for b in bookings:
@@ -117,6 +131,7 @@ class SalesRecordingService:
 
             leads.append(TestRideLeadItem(
                 customer_id=cust_id_str,
+                brand_id=b_id,
                 name=cust_name,
                 phone=cust_phone,
                 email=cust_email,
@@ -138,20 +153,30 @@ class SalesRecordingService:
             ))
 
         if not dealership_id or dealership_id == "ALL":
-            cust_stmt = select(Customer).order_by(Customer.updated_at.desc()).limit(10)
+            cust_stmt = (
+                select(Customer)
+                .where(Customer.brand_id == b_id)
+                .order_by(Customer.updated_at.desc())
+                .limit(10)
+            )
             cust_res = await db.execute(cust_stmt)
             customers = cust_res.scalars().all()
+
+            active_brand = BrandService.get_brand(b_id)
+            def_dlr_name = (active_brand.dealerships[0].name if active_brand and active_brand.dealerships else f"{b_id.title()} Official Dealership")
+            def_dlr_id = (active_brand.dealerships[0].id if active_brand and active_brand.dealerships else f"{b_id}_flagship")
+
             for c in customers:
                 norm_phone = clean_phone(c.phone) if c.phone else f"NOPHONE-{c.id}"
                 if norm_phone not in seen_phones:
                     seen_phones.add(norm_phone)
-                    v_info = CatalogService.get_vehicle_by_id(c.interested_vehicle_id or "thar_roxx")
-                    veh_name = v_info.name if v_info else "Mahindra Thar ROXX"
+                    v_info = CatalogService.get_vehicle_by_id(c.interested_vehicle_id or ("bmw_x5" if b_id == "bmw" else "creta" if b_id == "hyundai" else "grand_vitara" if b_id == "maruti_suzuki" else "thar_roxx"))
+                    veh_name = v_info.name if v_info else (c.interested_vehicle_id or "Vehicle").replace("_", " ").title()
                     db_checklist = c.advisor_checklist
                     is_custom = bool(db_checklist and len(db_checklist) > 0)
                     final_checklist = db_checklist if is_custom else CatalogService.get_static_checklist(c.interested_vehicle_id or "thar_roxx")
 
-                    tr_rec_stmt = select(TestRideRecording).where(TestRideRecording.customer_id == c.id)
+                    tr_rec_stmt = select(TestRideRecording).where(TestRideRecording.customer_id == c.id, TestRideRecording.brand_id == b_id)
                     tr_res = await db.execute(tr_rec_stmt)
                     has_tr_rec = tr_res.scalars().first() is not None
 
@@ -159,15 +184,16 @@ class SalesRecordingService:
 
                     leads.append(TestRideLeadItem(
                         customer_id=c.customer_id,
+                        brand_id=b_id,
                         name=c.name,
                         phone=c.phone,
                         email=c.email,
                         city=c.city or "Mumbai",
-                        preferred_vehicle=f"{veh_name} ({c.interested_variant or 'AX7L Diesel AT 4x4'})",
-                        vehicle_id=c.interested_vehicle_id or "thar_roxx",
-                        variant=c.interested_variant or "AX7L Diesel AT 4x4",
-                        dealership_name="Mahindra Bayview Motors - Bandra West",
-                        dealership_id="bayview_bandra",
+                        preferred_vehicle=f"{veh_name} ({c.interested_variant or 'Official Variant'})",
+                        vehicle_id=c.interested_vehicle_id or ("bmw_x5" if b_id == "bmw" else "thar_roxx"),
+                        variant=c.interested_variant or "Official Variant",
+                        dealership_name=def_dlr_name,
+                        dealership_id=def_dlr_id,
                         booking_status=resolved_status,
                         scheduled_slot="Tomorrow at 11:00 AM",
                         presales_notes=f"Explored {veh_name} in Virtual Showroom. Inquired about pricing and performance.",
@@ -180,7 +206,14 @@ class SalesRecordingService:
 
     @staticmethod
     async def process_and_store_recording(db: AsyncSession, req: TestRideRecordingUploadRequest) -> TestRideRecording:
+        # Determine brand_id
+        b_id = (
+            getattr(req, "brand_id", None) or
+            (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")
+        ).lower()
+
         # Invalidate leads cache on new recording upload
+        cache.invalidate(f"sales_leads_{b_id}")
         cache.invalidate("sales_leads_")
         """
         Saves test ride audio recording at:
@@ -190,19 +223,20 @@ class SalesRecordingService:
         """
         # 1. Resolve Customer
         stmt = select(Customer).where(
-            (Customer.customer_id == req.customer_id) |
-            (Customer.phone == req.customer_id)
+            ((Customer.customer_id == req.customer_id) | (Customer.phone == req.customer_id)) &
+            (Customer.brand_id == b_id)
         )
         res = await db.execute(stmt)
         customer = res.scalars().first()
 
         if not customer:
-            stmt_all = select(Customer).limit(1)
+            stmt_all = select(Customer).where(Customer.brand_id == b_id).limit(1)
             res_all = await db.execute(stmt_all)
             customer = res_all.scalars().first()
             if not customer:
                 customer = Customer(
                     customer_id=req.customer_id,
+                    brand_id=b_id,
                     name=req.customer_name or "Aarav Sharma",
                     phone="+91 98201 23456",
                     email="aarav.sharma@example.com",
@@ -292,30 +326,154 @@ class SalesRecordingService:
             logger.error(f"Failed to upload to GCS bucket {gcs_bucket}: {e}")
 
         # 4. Vehicle metadata and Advisor details
-        v_info = CatalogService.get_vehicle_by_id(req.vehicle_id)
-        veh_name = v_info.name if v_info else req.vehicle_id.replace("_", " ").title()
-        cust_name = req.customer_name or customer.name or "Aarav Sharma"
-        advisor_name = req.sales_advisor_name or "Rajesh Varma (Senior SUV Specialist)"
+        from app.services.brand_service import BrandService
+
+        # Resolve active / requested brand
+        brand_id = getattr(req, "brand_id", None)
+        brand = BrandService.get_brand(brand_id) if brand_id else None
+        if not brand:
+            brand = BrandService.get_active_brand()
+        brand_name = brand.name.replace(r"\(.*\)", "").strip() if brand else "Automotive"
+        brand_short = brand_name.split(" ")[0].strip()
+
+        # Resolve vehicle details from brand or catalog
+        v_info = None
+        req_norm = req.vehicle_id.lower().replace("-", "_")
+        if brand and brand.vehicles:
+            for v in brand.vehicles:
+                if v.id.lower().replace("-", "_") == req_norm or v.id.lower() == req.vehicle_id.lower():
+                    v_info = v
+                    break
+        if not v_info:
+            v_info = CatalogService.get_vehicle_by_id(req.vehicle_id)
+
+        raw_veh_name = v_info.name if v_info else req.vehicle_id.replace("-", " ").replace("_", " ").title()
+        if brand_short.lower() in raw_veh_name.lower():
+            display_veh_name = raw_veh_name
+        else:
+            display_veh_name = f"{brand_short} {raw_veh_name}"
+
+        veh_name = display_veh_name
+        cust_name = req.customer_name or customer.name or "Ajitesh Kumar"
+        advisor_name = req.sales_advisor_name or f"Rajesh Varma (Senior {brand_short} Specialist)"
         advisor_short = advisor_name.split(" ")[0].replace("Specialist", "").strip("()") or "Rajesh"
 
         checklist_items = req.advisor_checklist or (booking.advisor_checklist if booking else None) or (customer.advisor_checklist if customer else None) or CatalogService.get_static_checklist(req.vehicle_id)
         session_id = req.session_id or f"TR-2026-{uuid.uuid4().hex[:6].upper()}"
 
-        # 5. Default Simulated Hindi In-Vehicle Test Drive Dialogue Script
-        engine_str = "2.0L mStallion Turbo-Petrol engine (200 bhp)" if "xuv700" in req.vehicle_id.lower() or "xuv" in req.vehicle_id.lower() else "2.2L mHawk Diesel engine (175 PS / 370 Nm)"
-        
-        simulated_transcript = f"""[00:12] Advisor {advisor_short}: "Namaste {cust_name} ji! Throttle thoda press karke dekhiye. Yeh {engine_str} hai—pickup instantly feel hoga."
-[00:32] {cust_name} (Customer): "Haan, response toh kafi punchy aur smooth hai. Cabin ke andar engine noise bilkul nahi aa rahi. Suspension bhi kaafi well-cushioned lag raha hai potholes par."
-[00:54] Advisor {advisor_short}: "Bilkul sir, isme Frequency Selective Damping (FSD) suspension hai, jo automatic road conditions ke hisaab se adjust hota hai."
+        # 5. Dynamic Indian In-Vehicle Test Drive Dialogue Script (Works for ALL cars & powertrains)
+        v_cat = (v_info.category if v_info else "").lower()
+        v_fuel = (v_info.fuel_or_battery if v_info else "").lower()
+        v_id = req.vehicle_id.lower()
+
+        is_ev = any(k in v_cat or k in v_fuel or k in v_id for k in ["electric", "ev", "battery", "born electric"])
+        is_hybrid = any(k in v_cat or k in v_fuel or k in v_id for k in ["hybrid", "strong hybrid", "e-hybrid"])
+
+        if is_ev:
+            engine_str = v_info.engine_specs if (v_info and v_info.engine_specs) else "High-Torque Permanent Magnet Electric Motor"
+            pickup_phrase = "zero lag ke saath instant electric acceleration"
+            customer_engine_praise = "Cabin ke andar motor noise ya vibrations bilkul nahi hain—super silent ride hai."
+        elif is_hybrid:
+            engine_str = v_info.engine_specs if (v_info and v_info.engine_specs) else "1.5L Intelligent Strong-Hybrid Powertrain"
+            pickup_phrase = "electric boost ke saath pickup"
+            customer_engine_praise = "EV mode se petrol engine ka transition bilkul seamless hai, aur cabin silent hai."
+        else:
+            if v_info and v_info.engine_specs:
+                engine_str = v_info.engine_specs.split("&")[0].strip()
+            elif "xuv700" in v_id or "xuv" in v_id:
+                engine_str = "2.0L Turbo-Petrol engine (200 bhp)"
+            elif "diesel" in v_fuel:
+                engine_str = "2.2L Diesel engine (175 PS / 370 Nm)"
+            else:
+                engine_str = "refined high-performance powertrain"
+            pickup_phrase = "pickup"
+            customer_engine_praise = "Cabin ke andar engine noise bilkul nahi aa rahi."
+
+        # Suspension
+        suspension_feature = None
+        if v_info and v_info.key_highlights:
+            for h in v_info.key_highlights:
+                if any(k in h.lower() for k in ["suspension", "damping", "damper", "fsd", "penta-link", "multi-link"]):
+                    suspension_feature = h
+                    break
+        if suspension_feature:
+            suspension_str = suspension_feature
+        elif "mahindra" in brand_name.lower():
+            suspension_str = "Frequency Selective Damping (FSD) suspension with Penta-Link"
+        elif "bmw" in brand_name.lower():
+            suspension_str = "Adaptive M precision-tuned suspension"
+        elif is_ev:
+            suspension_str = "Multi-Link Independent suspension with low center-of-gravity battery chassis"
+        else:
+            suspension_str = "advanced tuned comfort suspension"
+
+        # Sunroof & Voice Command
+        if "mahindra" in brand_name.lower():
+            sunroof_name = "segment ka sabse bada panoramic sunroof hai—hum isse 'Skyroof' bolte hain"
+            voice_command = "Hey Mahindra, open the skyroof"
+        elif "hyundai" in brand_name.lower():
+            sunroof_name = "Smart Voice-Enabled Panoramic Sunroof hai"
+            voice_command = "Hey Hyundai, open the sunroof"
+        elif "maruti" in brand_name.lower() or "suzuki" in brand_name.lower():
+            sunroof_name = "Segment-leading Dual-Pane Panoramic Sunroof hai"
+            voice_command = "Hi Suzuki, open the sunroof"
+        elif "bmw" in brand_name.lower():
+            sunroof_name = "Panoramic Glass Roof Sky Lounge hai"
+            voice_command = "Hey BMW, open the panoramic glass roof"
+        else:
+            sunroof_name = "Segment-leading Panoramic Sunroof hai"
+            voice_command = f"Hey {brand_short}, open the sunroof"
+
+        # Airbag / Safety Cage
+        airbag_str = "7 airbags"
+        if v_info and v_info.key_highlights:
+            for h in v_info.key_highlights:
+                if "airbag" in h.lower():
+                    airbag_str = h
+                    break
+        elif "bmw" in brand_name.lower():
+            airbag_str = "8 airbags with dynamic stability control"
+        elif "hyundai" in brand_name.lower() or "maruti" in brand_name.lower():
+            airbag_str = "6 airbags standard"
+
+        # Competitor & Market comparison
+        if "bmw" in brand_name.lower() or "luxury" in v_cat:
+            competitor_name = "Mercedes aur Audi"
+            competitor_short = "Mercedes ya Audi"
+            advantage_str = f"pure driving dynamics, 5-Star safety cage aur {display_veh_name} ki authentic luxury engineering"
+        elif is_ev:
+            competitor_name = "other mass-market EV options"
+            competitor_short = "dusre EV models"
+            advantage_str = f"fast DC charging capability, dedicated EV architecture, 5-Star safety aur reliable battery thermal management"
+        elif "hyundai" in brand_name.lower():
+            competitor_name = "Kia (Seltos / Carens)"
+            competitor_short = "Kia"
+            advantage_str = f"proven reliability, refined suspension, 5-Star safety rating aur superior resale value"
+        elif "maruti" in brand_name.lower() or "suzuki" in brand_name.lower():
+            competitor_name = "Hyundai aur Tata"
+            competitor_short = "Hyundai ya Tata"
+            advantage_str = f"best-in-class fuel efficiency, unmatched reliability, robust build aur nationwide service support"
+        elif "mahindra" in brand_name.lower():
+            competitor_name = "Kia (Seltos / Carens)"
+            competitor_short = "Kia"
+            advantage_str = f"segment, solid road presence, 5-Star crash safety aur heavy-duty build quality"
+        else:
+            competitor_name = "market competitors"
+            competitor_short = "competitors"
+            advantage_str = f"5-Star crash safety, superior engineering aur heavy-duty build quality"
+
+        simulated_transcript = f"""[00:12] Advisor {advisor_short}: "Namaste {cust_name} ji! Throttle thoda press karke dekhiye. Yeh {engine_str} hai—{pickup_phrase} instantly feel hoga."
+[00:32] {cust_name} (Customer): "Haan, response toh kafi punchy aur smooth hai. {customer_engine_praise} Suspension bhi kaafi well-cushioned lag raha hai potholes par."
+[00:54] Advisor {advisor_short}: "Bilkul sir, isme {suspension_str} hai, jo automatic road conditions ke hisaab se adjust hota hai."
 [01:18] {cust_name} (Customer): "Aur yeh sunroof poora piche tak jaata hai kya? Kids love big sunroofs."
-[01:38] Advisor {advisor_short}: "Sir, yeh segment ka sabse bada panoramic sunroof hai—hum isse 'Skyroof' bolte hain. Aap screen par tap karke ya simple voice command se bhi open kar sakte hain. Just say: 'Hey Mahindra, open the skyroof'."
+[01:38] Advisor {advisor_short}: "Sir, yeh {sunroof_name}. Aap screen par tap karke ya simple voice command se bhi open kar sakte hain. Just say: '{voice_command}'."
 [01:58] {cust_name} (Customer): "Impressive! Glass area kaafi wide hai, cabin pura airy feel ho raha hai."
 [02:15] {cust_name} (Customer): "Safety package kaisa hai iska? ABS aur brakes ka calibration kaisa rehta hai sudden stop par?"
 [02:36] Advisor {advisor_short}: "Sir, isme Electronic Stability Program (ESP) ke saath ABS with EBD aur All-Wheel Disc Brakes standard aate hain. Agar emergency braking karni pade, toh car skid nahi hoti aur steering control bana rehta hai."
 [02:55] {cust_name} (Customer): "Aur Global NCAP rating kitni mili hai isko?"
-[03:10] Advisor {advisor_short}: "Mahindra {veh_name} ko solid 5-Star Global NCAP safety rating mili hai with 7 airbags aur ultra-high strength steel cage structure."
-[03:32] {cust_name} (Customer): "Sab theek hai, but honestly Kia (Seltos / Carens) market mein thoda cheaper padta hai. Features bhi kaafi de rahe hain woh log at a lower price point."
-[03:52] Advisor {advisor_short}: "Valid point {cust_name} ji! Kia pricing aur feature list mein attractive lagti hai, lekin jab aap segment, 200 bhp power, 5-Star crash safety aur heavy-duty build quality compare karenge toh difference clear hai."
+[03:10] Advisor {advisor_short}: "{display_veh_name} ko solid 5-Star Global NCAP safety rating mili hai with {airbag_str} aur ultra-high strength steel cage structure."
+[03:32] {cust_name} (Customer): "Sab theek hai, but honestly {competitor_name} market mein thoda cheaper padta hai. Features bhi kaafi de rahe hain woh log at a lower price point."
+[03:52] Advisor {advisor_short}: "Valid point {cust_name} ji! {competitor_short} pricing aur feature list mein attractive lagti hai, lekin jab aap {advantage_str} compare karenge toh difference clear hai."
 [04:14] {cust_name} (Customer): "Hmm, makes sense. Agar finalize karein, toh EMI options ka kya scene hai? Is flexible financing available?"
 [04:32] Advisor {advisor_short}: "Bilkul sir! Hamare paas major banks (HDFC, SBI, ICICI) ke saath tie-ups hain. Aap minimum 10% se 15% down payment de sakte hain, aur tenure 3 se 7 years tak select kar sakte hain. Digital instant approval bhi ho jayega."
 [04:50] {cust_name} (Customer): "Bahut badhiya! Overall experience aur drive dono top notch hain. Chaliye dealership chalte hain aur booking & financing initiate karte hain."
@@ -325,7 +483,7 @@ class SalesRecordingService:
         customer_sentiment = 0.85
         purchase_intent = 0.85
         advisor_score = 8.0
-        
+
         is_live_recording = bool(has_real_audio and ("simulat" not in (req.simulated_scenario or "").lower()))
 
         if is_live_recording:
@@ -333,17 +491,17 @@ class SalesRecordingService:
             objections_raised: List[str] = []
         else:
             loved_features = [
-                f"{veh_name} Engine Performance & Acceleration",
+                f"{display_veh_name} Performance & Acceleration",
                 "Ride Comfort & Pliant Suspension",
-                "Skyroof & Cabin Spaciousness"
+                "Panoramic Sunroof & Cabin Spaciousness"
             ]
             objections_raised = [
-                "Segment competitor comparison",
+                f"{competitor_name} segment pricing comparison",
                 "Flexible financing and EMI options"
             ]
 
-        advisor_coaching = f"Advisor {advisor_short} presented vehicle capabilities and answered customer queries."
-        recommended_action = f"Initiate digital loan application and finalize booking for {cust_name} ({veh_name})."
+        advisor_coaching = f"Advisor {advisor_short} presented {display_veh_name} capabilities and answered customer queries."
+        recommended_action = f"Initiate digital loan application and finalize booking for {cust_name} ({display_veh_name})."
 
         # 6. Dynamic Evaluation and Transcription using Gemini Multimodal Audio Model
         try:
@@ -362,7 +520,7 @@ class SalesRecordingService:
             if is_live_recording and raw_bytes:
                 # Transcribe directly from recorded audio and extract speech insights
                 audio_part = types.Part.from_bytes(data=raw_bytes, mime_type=audio_mime_type)
-                analysis_prompt = f"""You are an expert Automotive Sales Audio Analyst and Transcriber for Mahindra Auto.
+                analysis_prompt = f"""You are an expert Automotive Sales Audio Analyst and Transcriber for {brand_name}.
 You are given an authentic in-vehicle audio recording from a real test drive session between Sales Advisor {advisor_name} and Customer {cust_name} for vehicle {veh_name} ({req.variant}).
 
 CRITICAL INSTRUCTIONS:
@@ -378,7 +536,7 @@ Return strictly valid JSON with keys:
                 contents = [audio_part, analysis_prompt]
             else:
                 # Text analysis on simulation transcript
-                analysis_prompt = f"""You are an expert Automotive Sales Audio Analyst for Mahindra Auto.
+                analysis_prompt = f"""You are an expert Automotive Sales Audio Analyst for {brand_name}.
 Analyze this in-vehicle test drive conversation between Sales Advisor {advisor_name} and Customer {cust_name} for vehicle {veh_name} ({req.variant}).
 
 Conversation Transcript:
@@ -452,6 +610,7 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
             booking_id=booking_id,
             booking_reference=booking_ref,
             customer_id=customer.id,
+            brand_id=b_id,
             vehicle_id=req.vehicle_id,
             vehicle_name=f"{veh_name} ({req.variant})",
             sales_advisor_name=advisor_name,
@@ -484,6 +643,7 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
                 
                 log = InteractionLog(
                     customer_id=customer.id,
+                    brand_id=b_id,
                     session_id=None,
                     speaker=spk,
                     message=dialogue,
@@ -507,16 +667,22 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
         db: AsyncSession,
         customer_id: Optional[str] = None,
         booking_reference: Optional[str] = None,
-        phone: Optional[str] = None
+        phone: Optional[str] = None,
+        brand_id: Optional[str] = None
     ) -> Optional[TestRideRecording]:
         """
         Retrieves the latest persisted TestRideRecording insights for a customer,
-        matching by booking_reference, customer_id, or customer phone.
+        matching by booking_reference, customer_id, or customer phone, scoped to brand.
         """
+        b_id = brand_id.lower() if brand_id else None
+
         if booking_reference and booking_reference.strip():
             b_stmt = select(TestRideRecording).where(
                 TestRideRecording.booking_reference == booking_reference.strip()
-            ).order_by(TestRideRecording.created_at.desc())
+            )
+            if b_id:
+                b_stmt = b_stmt.where(TestRideRecording.brand_id == b_id)
+            b_stmt = b_stmt.order_by(TestRideRecording.created_at.desc())
             res = await db.execute(b_stmt)
             rec = res.scalars().first()
             if rec:
@@ -527,12 +693,17 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
                 (Customer.customer_id == customer_id.strip()) |
                 (Customer.phone == customer_id.strip())
             )
+            if b_id:
+                c_stmt = c_stmt.where(Customer.brand_id == b_id)
             c_res = await db.execute(c_stmt)
             cust = c_res.scalars().first()
             if cust:
                 rec_stmt = select(TestRideRecording).where(
                     TestRideRecording.customer_id == cust.id
-                ).order_by(TestRideRecording.created_at.desc())
+                )
+                if b_id:
+                    rec_stmt = rec_stmt.where(TestRideRecording.brand_id == b_id)
+                rec_stmt = rec_stmt.order_by(TestRideRecording.created_at.desc())
                 rec_res = await db.execute(rec_stmt)
                 rec = rec_res.scalars().first()
                 if rec:
@@ -541,12 +712,17 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
         if phone and phone.strip():
             clean_p = clean_phone(phone)
             c_stmt = select(Customer).where(Customer.phone.ilike(f"%{clean_p[-10:] if len(clean_p) >= 10 else clean_p}%"))
+            if b_id:
+                c_stmt = c_stmt.where(Customer.brand_id == b_id)
             c_res = await db.execute(c_stmt)
             cust = c_res.scalars().first()
             if cust:
                 rec_stmt = select(TestRideRecording).where(
                     TestRideRecording.customer_id == cust.id
-                ).order_by(TestRideRecording.created_at.desc())
+                )
+                if b_id:
+                    rec_stmt = rec_stmt.where(TestRideRecording.brand_id == b_id)
+                rec_stmt = rec_stmt.order_by(TestRideRecording.created_at.desc())
                 rec_res = await db.execute(rec_stmt)
                 rec = rec_res.scalars().first()
                 if rec:
@@ -562,7 +738,10 @@ Return valid JSON with keys: transcript, customer_sentiment_score, purchase_inte
         return res.scalars().first()
 
     @staticmethod
-    async def get_all_test_rides(db: AsyncSession) -> List[TestRideRecording]:
-        stmt = select(TestRideRecording).order_by(TestRideRecording.created_at.desc()).limit(20)
+    async def get_all_test_rides(db: AsyncSession, brand_id: Optional[str] = None) -> List[TestRideRecording]:
+        stmt = select(TestRideRecording)
+        if brand_id:
+            stmt = stmt.where(TestRideRecording.brand_id == brand_id.lower())
+        stmt = stmt.order_by(TestRideRecording.created_at.desc()).limit(20)
         res = await db.execute(stmt)
         return res.scalars().all()

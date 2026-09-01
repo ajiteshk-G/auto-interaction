@@ -28,16 +28,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings", tags=["Test Drive Bookings"])
 
+from app.services.brand_service import BrandService
+
 async def resolve_dealership_from_db(
     db: AsyncSession,
     pin_code: Optional[str] = None,
     dealership_id: Optional[str] = None,
-    city: Optional[str] = None
+    city: Optional[str] = None,
+    brand_id: Optional[str] = None
 ) -> Optional[Dealership]:
-    """Dynamically resolves the best matching dealership from the database."""
+    """Dynamically resolves the best matching dealership from the database, scoped to brand."""
+    b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+
     # 1. By direct dealership_id
     if dealership_id:
-        stmt = select(Dealership).where(Dealership.id == dealership_id, Dealership.is_active == True)
+        stmt = select(Dealership).where(Dealership.id == dealership_id, Dealership.is_active == True, Dealership.brand_id == b_id)
         res = await db.execute(stmt)
         dlr = res.scalars().first()
         if dlr:
@@ -47,7 +52,7 @@ async def resolve_dealership_from_db(
     if pin_code and pin_code.strip():
         clean_pin = pin_code.strip()
         # Direct exact PIN match
-        stmt = select(Dealership).where(Dealership.pin_code == clean_pin, Dealership.is_active == True)
+        stmt = select(Dealership).where(Dealership.pin_code == clean_pin, Dealership.is_active == True, Dealership.brand_id == b_id)
         res = await db.execute(stmt)
         dlr = res.scalars().first()
         if dlr:
@@ -67,7 +72,7 @@ async def resolve_dealership_from_db(
             target_city = "Chennai"
 
         if target_city:
-            stmt = select(Dealership).where(func.lower(Dealership.city) == target_city.lower(), Dealership.is_active == True)
+            stmt = select(Dealership).where(func.lower(Dealership.city) == target_city.lower(), Dealership.is_active == True, Dealership.brand_id == b_id)
             res = await db.execute(stmt)
             dlr = res.scalars().first()
             if dlr:
@@ -75,13 +80,20 @@ async def resolve_dealership_from_db(
 
     # 3. By City Name
     if city and city.strip():
-        stmt = select(Dealership).where(func.lower(Dealership.city) == city.strip().lower(), Dealership.is_active == True)
+        stmt = select(Dealership).where(func.lower(Dealership.city) == city.strip().lower(), Dealership.is_active == True, Dealership.brand_id == b_id)
         res = await db.execute(stmt)
         dlr = res.scalars().first()
         if dlr:
             return dlr
 
-    # 4. Fallback to first available active dealership in database
+    # 4. Fallback to first available active dealership in database for this brand
+    stmt = select(Dealership).where(Dealership.is_active == True, Dealership.brand_id == b_id)
+    res = await db.execute(stmt)
+    dlr = res.scalars().first()
+    if dlr:
+        return dlr
+
+    # 5. Fallback to any active dealership
     stmt = select(Dealership).where(Dealership.is_active == True)
     res = await db.execute(stmt)
     return res.scalars().first()
@@ -93,6 +105,7 @@ async def get_available_slots(
     pin_code: Optional[str] = Query(None, description="Customer Area PIN Code to find nearest showroom"),
     dealership_id: Optional[str] = Query(None, description="Specific Dealership ID if selected"),
     city: Optional[str] = Query(None, description="City name (Mumbai, Pune, Delhi, Bangalore, Chennai)"),
+    brand_id: Optional[str] = Query(None, description="Brand ID (mahindra, bmw, hyundai, maruti_suzuki)"),
     vehicle_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
@@ -109,10 +122,13 @@ async def get_available_slots(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
+    b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+
     # 1. Resolve Showroom from Database
-    dealership = await resolve_dealership_from_db(db, pin_code=pin_code, dealership_id=dealership_id, city=city)
-    active_dlr_id = dealership.id if dealership else "mumbai_nbs_chowpatty"
-    active_dlr_name = dealership.name if dealership else "Mahindra Official Showroom"
+    dealership = await resolve_dealership_from_db(db, pin_code=pin_code, dealership_id=dealership_id, city=city, brand_id=b_id)
+    active_brand = BrandService.get_brand(b_id)
+    active_dlr_id = dealership.id if dealership else (active_brand.dealerships[0].id if active_brand and active_brand.dealerships else f"{b_id}_flagship")
+    active_dlr_name = dealership.name if dealership else (active_brand.dealerships[0].name if active_brand and active_brand.dealerships else f"{b_id.title()} Official Showroom")
 
     # 2. Check Sunday Rule (0=Mon, 6=Sun)
     is_sunday = parsed_date.weekday() == 6
@@ -269,13 +285,17 @@ async def reserve_test_drive_slot(
         )
 
     # 4. Resolve Dealership from Database
-    dealership = await resolve_dealership_from_db(db, pin_code=req.pin_code, dealership_id=req.dealership_id)
-    dealership_id = dealership.id if dealership else "mumbai_nbs_chowpatty"
-    dealership_name = dealership.name if dealership else "Mahindra Official Showroom"
+    b_id = (req.brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
+    active_b = BrandService.get_brand(b_id)
+    brand_disp_name = active_b.name if active_b else b_id.title()
+
+    dealership = await resolve_dealership_from_db(db, pin_code=req.pin_code, dealership_id=req.dealership_id, brand_id=b_id)
+    dealership_id = dealership.id if dealership else (active_b.dealerships[0].id if active_b and active_b.dealerships else f"{b_id}_flagship")
+    dealership_name = dealership.name if dealership else (active_b.dealerships[0].name if active_b and active_b.dealerships else f"{brand_disp_name} Showroom")
     advisor_name = (
         dealership.available_advisors[0]
         if (dealership and dealership.available_advisors)
-        else "Rajesh Varma (Senior Specialist)"
+        else f"{brand_disp_name} Specialist"
     )
 
     # 5. Resolve Customer dynamically by entered phone number
@@ -283,12 +303,14 @@ async def reserve_test_drive_slot(
         db,
         phone=req.customer_phone,
         name=req.customer_name,
-        vehicle_id=req.vehicle_id
+        vehicle_id=req.vehicle_id,
+        brand_id=b_id
     )
 
     # Idempotency check: if customer already reserved this exact slot, return existing booking
     existing_b_stmt = select(TestDriveBooking).where(
         TestDriveBooking.customer_id == customer.id,
+        TestDriveBooking.brand_id == b_id,
         TestDriveBooking.vehicle_id == req.vehicle_id,
         TestDriveBooking.scheduled_date == req.slot_date,
         TestDriveBooking.scheduled_time_slot == req.slot_time
@@ -304,7 +326,7 @@ async def reserve_test_drive_slot(
             slot_date=req.slot_date,
             slot_time=req.slot_time,
             booking_type=existing_booking.booking_type or "HOME_DOORSTEP",
-            vehicle_name=v_info.name if v_info else "Mahindra SUV",
+            vehicle_name=v_info.name if v_info else f"{brand_disp_name} Vehicle",
             dealership_name=dealership_name,
             sales_advisor_name=advisor_name,
             customer_name=req.customer_name,
@@ -314,13 +336,14 @@ async def reserve_test_drive_slot(
             whatsapp_dispatched=True
         )
 
-    booking_ref = f"BK-MAH-{int(time.time()) % 100000}"
+    booking_ref = f"BK-{b_id.upper()[:3]}-{int(time.time()) % 100000}"
 
     # 6. Check and update slot in DB
     stmt = select(TestDriveSlot).where(
         TestDriveSlot.slot_date == req.slot_date,
         TestDriveSlot.slot_time == req.slot_time,
-        TestDriveSlot.dealership_id == dealership_id
+        TestDriveSlot.dealership_id == dealership_id,
+        TestDriveSlot.brand_id == b_id
     )
     res = await db.execute(stmt)
     slot = res.scalars().first()
@@ -332,6 +355,7 @@ async def reserve_test_drive_slot(
                 detail=f"The {req.slot_time} slot on {req.slot_date} at {dealership_name} is already reserved. Please select another slot."
             )
         slot.status = "RESERVED"
+        slot.brand_id = b_id
         slot.customer_id = customer.id
         slot.customer_name = req.customer_name
         slot.customer_phone = req.customer_phone
@@ -346,6 +370,7 @@ async def reserve_test_drive_slot(
             slot_date=req.slot_date,
             slot_time=req.slot_time,
             dealership_id=dealership_id,
+            brand_id=b_id,
             vehicle_id=req.vehicle_id,
             status="RESERVED",
             customer_id=customer.id,
@@ -362,13 +387,13 @@ async def reserve_test_drive_slot(
 
     # 7. Create TestDriveBooking in database
     v_info = CatalogService.get_vehicle_by_id(req.vehicle_id)
-    vehicle_display_name = v_info.name if v_info else "Mahindra Thar ROXX"
+    vehicle_display_name = v_info.name if v_info else f"{brand_disp_name} Vehicle"
 
     # Resolve advisor checklist from request, customer profile, interaction history, or notes
     from app.services.checklist_service import ChecklistService
     lead_checklist = req.advisor_checklist or customer.advisor_checklist
     if not lead_checklist or len(lead_checklist) == 0:
-        i_stmt = select(InteractionLog).where(InteractionLog.customer_id == customer.id)
+        i_stmt = select(InteractionLog).where((InteractionLog.customer_id == customer.id) & (InteractionLog.brand_id == b_id))
         i_res = await db.execute(i_stmt)
         customer_dialogues = " ".join([l.message for l in i_res.scalars().all() if l.speaker == "customer"])
         if customer_dialogues:
@@ -383,9 +408,10 @@ async def reserve_test_drive_slot(
     booking = TestDriveBooking(
         booking_reference=booking_ref,
         customer_id=customer.id,
+        brand_id=b_id,
         vehicle_id=req.vehicle_id,
-        variant=req.variant or "AX7L Diesel AT 4x4",
-        color=req.color or "Stealth Black",
+        variant=req.variant or "Official Variant",
+        color=req.color or "Metallic Finish",
         dealership_id=dealership_id,
         dealership_name=dealership_name,
         sales_advisor_name=advisor_name,
@@ -405,12 +431,13 @@ async def reserve_test_drive_slot(
     await CustomerService.log_interaction(
         db,
         customer_id_str=customer.customer_id,
-        speaker="mia",
+        speaker=f"{b_id}_assistant",
         message=f"Reserved test drive for {vehicle_display_name} at {dealership_name} on {req.slot_date} at {req.slot_time}. Reference: {booking_ref}",
         channel="VOICE_LIVE",
         session_id_str=f"BOOKING-{booking_ref}",
         intent="TEST_DRIVE_BOOKED",
-        tool="reserve_slot_db"
+        tool="reserve_slot_db",
+        brand_id=b_id
     )
 
     await db.commit()
@@ -456,11 +483,18 @@ async def list_my_bookings(
     customer_id: Optional[str] = None,
     phone: Optional[str] = None,
     status: Optional[str] = None,
+    brand_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
+    b_id = brand_id.lower() if brand_id else None
     stmt = select(TestDriveBooking)
+    if b_id:
+        stmt = stmt.where(TestDriveBooking.brand_id == b_id)
+
     if customer_id:
         c_stmt = select(Customer).where((Customer.customer_id == customer_id) | (Customer.id == customer_id if customer_id.isdigit() else False))
+        if b_id:
+            c_stmt = c_stmt.where(Customer.brand_id == b_id)
         c_res = await db.execute(c_stmt)
         cust = c_res.scalars().first()
         if cust:
@@ -470,6 +504,8 @@ async def list_my_bookings(
     elif phone:
         normalized_phone = clean_phone(phone)
         c_stmt = select(Customer).where((Customer.phone == normalized_phone) | (Customer.phone == phone))
+        if b_id:
+            c_stmt = c_stmt.where(Customer.brand_id == b_id)
         c_res = await db.execute(c_stmt)
         cust = c_res.scalars().first()
         if cust:
@@ -488,14 +524,21 @@ async def list_bookings(
     customer_id: Optional[int] = None,
     phone: Optional[str] = None,
     status: Optional[str] = None,
+    brand_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
+    b_id = brand_id.lower() if brand_id else None
     stmt = select(TestDriveBooking)
+    if b_id:
+        stmt = stmt.where(TestDriveBooking.brand_id == b_id)
+
     if customer_id:
         stmt = stmt.where(TestDriveBooking.customer_id == customer_id)
     elif phone:
         normalized_phone = clean_phone(phone)
         c_stmt = select(Customer).where((Customer.phone == normalized_phone) | (Customer.phone == phone))
+        if b_id:
+            c_stmt = c_stmt.where(Customer.brand_id == b_id)
         c_res = await db.execute(c_stmt)
         cust = c_res.scalars().first()
         if cust:
@@ -514,14 +557,16 @@ async def create_booking(
     booking_in: TestDriveBookingCreate,
     db: AsyncSession = Depends(get_db)
 ):
+    b_id = (booking_in.brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
     customer = None
     if booking_in.customer_phone:
-        customer = await CustomerService.get_customer_by_phone(db, booking_in.customer_phone)
+        customer = await CustomerService.get_customer_by_phone(db, booking_in.customer_phone, brand_id=b_id)
     if not customer and booking_in.customer_id:
-        customer = await CustomerService.get_customer_by_id(db, booking_in.customer_id)
+        customer = await CustomerService.get_customer_by_id(db, booking_in.customer_id, brand_id=b_id)
         if not customer:
             customer = Customer(
                 customer_id=booking_in.customer_id,
+                brand_id=b_id,
                 name=booking_in.customer_name or "Valued Customer",
                 phone=f"+91 98{abs(hash(booking_in.customer_id)) % 100000000:08d}",
                 city="Mumbai",
@@ -531,12 +576,13 @@ async def create_booking(
             await db.commit()
             await db.refresh(customer)
     if not customer:
-        customer = await CustomerService.get_or_create_default_customer(db)
+        customer = await CustomerService.get_or_create_default_customer(db, brand_id=b_id)
 
-    booking_ref = f"BK-MAH-{int(time.time()) % 100000}"
-    dealers = CatalogService.get_dealerships()
+    booking_ref = f"BK-{b_id.upper()[:3]}-{int(time.time()) % 100000}"
+    active_b = BrandService.get_brand(b_id)
+    dealers = active_b.dealerships if active_b and active_b.dealerships else CatalogService.get_dealerships()
     d_match = next((d for d in dealers if d.id == booking_in.dealership_id), dealers[0])
-    advisor = d_match.available_advisors[0] if d_match.available_advisors else "Rajesh Varma"
+    advisor = d_match.available_advisors[0] if (d_match and d_match.available_advisors) else f"{b_id.title()} Specialist"
 
     from app.services.checklist_service import ChecklistService
     chk = booking_in.advisor_checklist or customer.advisor_checklist
@@ -548,13 +594,14 @@ async def create_booking(
     booking = TestDriveBooking(
         booking_reference=booking_ref,
         customer_id=customer.id,
+        brand_id=b_id,
         vehicle_id=booking_in.vehicle_id,
         variant=booking_in.variant,
-        color=booking_in.color,
-        dealership_id=booking_in.dealership_id,
-        dealership_name=d_match.name,
+        color=booking_in.color or "Metallic Finish",
+        dealership_id=booking_in.dealership_id or (d_match.id if d_match else f"{b_id}_flagship"),
+        dealership_name=d_match.name if d_match else f"{b_id.title()} Showroom",
         sales_advisor_name=advisor,
-        booking_type=booking_in.booking_type,
+        booking_type=booking_in.booking_type or "HOME_DOORSTEP",
         delivery_address=booking_in.delivery_address,
         scheduled_date=booking_in.scheduled_date,
         scheduled_time_slot=booking_in.scheduled_time_slot,

@@ -8,6 +8,7 @@ class TestDriveBooking(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     booking_reference = Column(String(64), unique=True, index=True, nullable=False) # e.g. "BK-MAH-2026-8821"
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     
     vehicle_id = Column(String(64), nullable=False) # "thar_roxx", "be_6e", "xuv700"
@@ -37,6 +38,7 @@ class TestDriveSlot(Base):
     __tablename__ = "test_drive_slots"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     slot_date = Column(String(32), index=True, nullable=False) # e.g. "2026-08-26"
     slot_time = Column(String(32), nullable=False) # e.g. "11:00 AM"
     dealership_id = Column(String(64), default="bayview_bandra")

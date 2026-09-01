@@ -1,0 +1,426 @@
+{
+  "id": "cymbal",
+  "name": "Cymbal",
+  "tagline": "Harmony in Motion, Innovation in Every Drive.",
+  "logo_url": "/uploads/cymbal/logos/logo.svg",
+  "primary_color": "#007bff",
+  "secondary_color": "#0f172a",
+  "accent_color": "#3498db",
+  "avatar_name": "Kavya",
+  "avatar_voice": "Aoede",
+  "source_urls": [],
+  "is_active": false,
+  "vehicles": [
+    {
+      "id": "cymbal_aura",
+      "name": "Cymbal Aura",
+      "tagline": "Your Urban Adventure Starts Here.",
+      "category": "Compact SUV",
+      "price_range": "\u20b911.50 Lakh - \u20b918.50 Lakh",
+      "hero_image": "/uploads/cymbal/vehicles/cymbal_aura_concept_1788264378.png",
+      "engine_specs": "1.5L Turbo Petrol 120 hp / 1.5L Diesel 115 hp",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "17.5 km/l (Petrol) / 22.0 km/l (Diesel)",
+      "key_highlights": [
+        "Panoramic Sunroof",
+        "10.25-inch Touchscreen Infotainment",
+        "ADAS Level 2",
+        "Wireless Android Auto / Apple CarPlay",
+        "360-degree Camera"
+      ],
+      "usp": "A feature-packed compact SUV offering premium comfort and advanced safety for the modern urban explorer.",
+      "variants": [
+        {
+          "name": "Aura Pure (Petrol)",
+          "price_ex_showroom": "\u20b911.50 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol 120 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "8-inch Touchscreen",
+            "Dual Airbags",
+            "Rear Parking Sensors"
+          ]
+        },
+        {
+          "name": "Aura Pure (Diesel)",
+          "price_ex_showroom": "\u20b912.50 Lakh",
+          "engine_or_battery": "1.5L Diesel 115 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "8-inch Touchscreen",
+            "Dual Airbags",
+            "Rear Parking Sensors"
+          ]
+        },
+        {
+          "name": "Aura Elevate (Petrol)",
+          "price_ex_showroom": "\u20b914.80 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol 120 hp",
+          "transmission": "CVT Automatic",
+          "key_features": [
+            "10.25-inch Touchscreen",
+            "Electric Sunroof",
+            "Wireless Charger",
+            "4 Airbags"
+          ]
+        },
+        {
+          "name": "Aura Elevate (Diesel)",
+          "price_ex_showroom": "\u20b915.80 Lakh",
+          "engine_or_battery": "1.5L Diesel 115 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "10.25-inch Touchscreen",
+            "Electric Sunroof",
+            "Wireless Charger",
+            "4 Airbags"
+          ]
+        },
+        {
+          "name": "Aura Zenith (Petrol)",
+          "price_ex_showroom": "\u20b917.50 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol 120 hp",
+          "transmission": "CVT Automatic",
+          "key_features": [
+            "Panoramic Sunroof",
+            "ADAS Level 2",
+            "Ventilated Seats",
+            "6 Airbags",
+            "360-degree Camera"
+          ]
+        },
+        {
+          "name": "Aura Zenith (Diesel)",
+          "price_ex_showroom": "\u20b918.50 Lakh",
+          "engine_or_battery": "1.5L Diesel 115 hp",
+          "transmission": "6-Speed Automatic",
+          "key_features": [
+            "Panoramic Sunroof",
+            "ADAS Level 2",
+            "Ventilated Seats",
+            "6 Airbags",
+            "360-degree Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/cymbal/vehicles/cymbal_aura_concept_1788264378.png"
+    },
+    {
+      "id": "cymbal_zenith",
+      "name": "Cymbal Zenith",
+      "tagline": "Conquer Every Horizon with Confidence.",
+      "category": "Authentic SUV",
+      "price_range": "\u20b919.00 Lakh - \u20b929.50 Lakh",
+      "hero_image": "/uploads/cymbal/vehicles/cymbal_zenith_concept_1788264378.png",
+      "engine_specs": "2.0L Turbo Petrol 190 hp / 2.0L Turbo Diesel 170 hp",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "13.0 km/l (Petrol) / 16.5 km/l (Diesel)",
+      "key_highlights": [
+        "Intelligent AWD System",
+        "Premium Leather Interiors",
+        "Large Digital Cockpit",
+        "Terrain Response Modes",
+        "Powered Tailgate"
+      ],
+      "usp": "A robust and sophisticated SUV designed for both city commutes and challenging terrains, offering uncompromised performance and luxury.",
+      "variants": [
+        {
+          "name": "Zenith Adventure (Petrol)",
+          "price_ex_showroom": "\u20b919.00 Lakh",
+          "engine_or_battery": "2.0L Turbo Petrol 190 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Dual Zone Climate Control",
+            "6 Airbags"
+          ]
+        },
+        {
+          "name": "Zenith Adventure (Diesel)",
+          "price_ex_showroom": "\u20b920.50 Lakh",
+          "engine_or_battery": "2.0L Turbo Diesel 170 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Dual Zone Climate Control",
+            "6 Airbags"
+          ]
+        },
+        {
+          "name": "Zenith Summit (Petrol)",
+          "price_ex_showroom": "\u20b923.50 Lakh",
+          "engine_or_battery": "2.0L Turbo Petrol 190 hp",
+          "transmission": "8-Speed Automatic",
+          "key_features": [
+            "Panoramic Sunroof",
+            "Digital Instrument Cluster",
+            "Powered Driver Seat",
+            "ADAS Level 2"
+          ]
+        },
+        {
+          "name": "Zenith Summit (Diesel)",
+          "price_ex_showroom": "\u20b925.00 Lakh",
+          "engine_or_battery": "2.0L Turbo Diesel 170 hp",
+          "transmission": "8-Speed Automatic",
+          "key_features": [
+            "Panoramic Sunroof",
+            "Digital Instrument Cluster",
+            "Powered Driver Seat",
+            "ADAS Level 2"
+          ]
+        },
+        {
+          "name": "Zenith Apex (Diesel AWD)",
+          "price_ex_showroom": "\u20b929.50 Lakh",
+          "engine_or_battery": "2.0L Turbo Diesel 170 hp",
+          "transmission": "8-Speed Automatic",
+          "key_features": [
+            "Intelligent AWD",
+            "Terrain Response Modes",
+            "Premium Nappa Leather",
+            "Ventilated Front Seats",
+            "Powered Tailgate"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/cymbal/vehicles/cymbal_zenith_concept_1788264378.png"
+    },
+    {
+      "id": "cymbal_electra",
+      "name": "Cymbal Electra",
+      "tagline": "Electrify Your Journey, Sustain Your Future.",
+      "category": "Electric Crossover",
+      "price_range": "\u20b926.00 Lakh - \u20b936.00 Lakh",
+      "hero_image": "/uploads/cymbal/vehicles/cymbal_electra_concept_1788264388.png",
+      "engine_specs": "Single Motor FWD 150 hp / Dual Motor AWD 220 hp",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Electric",
+      "range_or_mileage": "420 km - 550 km WLTP",
+      "key_highlights": [
+        "Ultra-Fast Charging (DC 80% in 40 mins)",
+        "Regenerative Braking System",
+        "Connected Car Technology",
+        "Large Floating Infotainment Screen",
+        "Vehicle-to-Load (V2L) Functionality"
+      ],
+      "usp": "A cutting-edge electric crossover combining impressive range, rapid charging, and smart technology for an eco-conscious yet exhilarating drive.",
+      "variants": [
+        {
+          "name": "Electra Pure (Standard Range)",
+          "price_ex_showroom": "\u20b926.00 Lakh",
+          "engine_or_battery": "Single Motor FWD 150 hp, 50 kWh Battery",
+          "transmission": "Direct Drive",
+          "key_features": [
+            "420 km WLTP Range",
+            "10.25-inch Touchscreen",
+            "LED Headlamps",
+            "6 Airbags"
+          ]
+        },
+        {
+          "name": "Electra Elevate (Long Range)",
+          "price_ex_showroom": "\u20b930.50 Lakh",
+          "engine_or_battery": "Single Motor FWD 180 hp, 65 kWh Battery",
+          "transmission": "Direct Drive",
+          "key_features": [
+            "550 km WLTP Range",
+            "Panoramic Sunroof",
+            "Ventilated Front Seats",
+            "ADAS Level 2"
+          ]
+        },
+        {
+          "name": "Electra Performance (AWD)",
+          "price_ex_showroom": "\u20b936.00 Lakh",
+          "engine_or_battery": "Dual Motor AWD 220 hp, 65 kWh Battery",
+          "transmission": "Direct Drive",
+          "key_features": [
+            "500 km WLTP Range",
+            "Sport Suspension",
+            "Premium Audio System",
+            "V2L Functionality",
+            "360-degree Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/cymbal/vehicles/cymbal_electra_concept_1788264388.png"
+    },
+    {
+      "id": "cymbal_serene",
+      "name": "Cymbal Serene",
+      "tagline": "Refined Elegance, Unmatched Comfort.",
+      "category": "Sedan",
+      "price_range": "\u20b915.00 Lakh - \u20b923.00 Lakh",
+      "hero_image": "/uploads/cymbal/vehicles/cymbal_serene_concept_1788264391.png",
+      "engine_specs": "1.5L Turbo Petrol 140 hp / 1.5L Strong Hybrid 115 hp",
+      "seating_capacity": "5-Seater",
+      "fuel_or_battery": "Petrol / Hybrid",
+      "range_or_mileage": "18.0 km/l (Petrol) / 27.0 km/l (Hybrid)",
+      "key_highlights": [
+        "Luxurious Rear Seat Comfort",
+        "Advanced Noise Cancellation",
+        "Digital Driver Display",
+        "Premium Sound System",
+        "Rear Sun Blinds"
+      ],
+      "usp": "An executive sedan offering a perfect blend of sophisticated design, plush interiors, and efficient powertrains for a serene driving experience.",
+      "variants": [
+        {
+          "name": "Serene Pure (Petrol)",
+          "price_ex_showroom": "\u20b915.00 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol 140 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "8-inch Touchscreen",
+            "Automatic Climate Control",
+            "4 Airbags"
+          ]
+        },
+        {
+          "name": "Serene Elevate (Petrol)",
+          "price_ex_showroom": "\u20b917.50 Lakh",
+          "engine_or_battery": "1.5L Turbo Petrol 140 hp",
+          "transmission": "CVT Automatic",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Electric Sunroof",
+            "Powered Driver Seat",
+            "6 Airbags"
+          ]
+        },
+        {
+          "name": "Serene Elevate (Hybrid)",
+          "price_ex_showroom": "\u20b919.50 Lakh",
+          "engine_or_battery": "1.5L Strong Hybrid 115 hp",
+          "transmission": "e-CVT",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Electric Sunroof",
+            "Powered Driver Seat",
+            "6 Airbags",
+            "High Fuel Efficiency"
+          ]
+        },
+        {
+          "name": "Serene Zenith (Hybrid)",
+          "price_ex_showroom": "\u20b923.00 Lakh",
+          "engine_or_battery": "1.5L Strong Hybrid 115 hp",
+          "transmission": "e-CVT",
+          "key_features": [
+            "ADAS Level 2",
+            "Ventilated Front Seats",
+            "Premium Leather Upholstery",
+            "Digital Instrument Cluster",
+            "360-degree Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/cymbal/vehicles/cymbal_serene_concept_1788264391.png"
+    },
+    {
+      "id": "cymbal_grandeur",
+      "name": "Cymbal Grandeur",
+      "tagline": "Space for Everyone, Adventures for All.",
+      "category": "Family 7-Seater",
+      "price_range": "\u20b916.50 Lakh - \u20b926.00 Lakh",
+      "hero_image": "/uploads/cymbal/vehicles/cymbal_grandeur_concept_1788264398.png",
+      "engine_specs": "2.0L Petrol 150 hp / 2.0L Diesel 140 hp",
+      "seating_capacity": "7-Seater",
+      "fuel_or_battery": "Petrol / Diesel",
+      "range_or_mileage": "12.5 km/l (Petrol) / 15.0 km/l (Diesel)",
+      "key_highlights": [
+        "Flexible 2nd & 3rd Row Seating",
+        "Roof-mounted AC Vents for Rear Passengers",
+        "Multiple Charging Ports",
+        "Connected Car Features",
+        "High Ground Clearance"
+      ],
+      "usp": "A spacious and versatile 7-seater designed for large families, offering comfort, safety, and practicality for every journey.",
+      "variants": [
+        {
+          "name": "Grandeur Pure (Petrol)",
+          "price_ex_showroom": "\u20b916.50 Lakh",
+          "engine_or_battery": "2.0L Petrol 150 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "8-inch Touchscreen",
+            "Dual Airbags",
+            "Rear AC Vents"
+          ]
+        },
+        {
+          "name": "Grandeur Pure (Diesel)",
+          "price_ex_showroom": "\u20b917.80 Lakh",
+          "engine_or_battery": "2.0L Diesel 140 hp",
+          "transmission": "6-Speed Manual",
+          "key_features": [
+            "8-inch Touchscreen",
+            "Dual Airbags",
+            "Rear AC Vents"
+          ]
+        },
+        {
+          "name": "Grandeur Elevate (Petrol)",
+          "price_ex_showroom": "\u20b920.00 Lakh",
+          "engine_or_battery": "2.0L Petrol 150 hp",
+          "transmission": "6-Speed Automatic",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Electric Sunroof",
+            "6 Airbags",
+            "Cruise Control"
+          ]
+        },
+        {
+          "name": "Grandeur Elevate (Diesel)",
+          "price_ex_showroom": "\u20b921.50 Lakh",
+          "engine_or_battery": "2.0L Diesel 140 hp",
+          "transmission": "6-Speed Automatic",
+          "key_features": [
+            "10.25-inch Infotainment",
+            "Electric Sunroof",
+            "6 Airbags",
+            "Cruise Control"
+          ]
+        },
+        {
+          "name": "Grandeur Zenith (Diesel)",
+          "price_ex_showroom": "\u20b926.00 Lakh",
+          "engine_or_battery": "2.0L Diesel 140 hp",
+          "transmission": "6-Speed Automatic",
+          "key_features": [
+            "ADAS Level 2",
+            "Panoramic Sunroof",
+            "Ventilated Front Seats",
+            "Powered Tailgate",
+            "360-degree Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": true,
+      "uploaded_image_url": "/uploads/cymbal/vehicles/cymbal_grandeur_concept_1788264398.png"
+    }
+  ],
+  "dealerships": [
+    {
+      "id": "flagship_center_1",
+      "name": "Cymbal Experience Center",
+      "address": "Flagship Showroom Avenue, Worli",
+      "city": "Mumbai",
+      "phone": "+91 22 4000 8800",
+      "rating": 4.9,
+      "available_advisors": [
+        "Senior Brand Specialist",
+        "Product Genius"
+      ],
+      "has_test_drive_home_pickup": true
+    }
+  ]
+}

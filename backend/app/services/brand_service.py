@@ -16,10 +16,11 @@ class BrandService:
     _initialized: bool = False
 
     @classmethod
-    def initialize(cls):
-        if cls._initialized:
+    def initialize(cls, force_reload: bool = False):
+        if cls._initialized and not force_reload:
             return
         os.makedirs(DATA_DIR, exist_ok=True)
+        cls._brands.clear()
         for fname in os.listdir(DATA_DIR):
             if fname.endswith(".json"):
                 fpath = os.path.join(DATA_DIR, fname)
@@ -169,6 +170,36 @@ class BrandService:
             cls._save_to_disk(brand)
             return True
         return False
+
+    @classmethod
+    def delete_brand(cls, brand_id: str) -> bool:
+        cls.initialize()
+        brand_id = brand_id.lower()
+        if brand_id not in cls._brands:
+            return False
+        if len(cls._brands) <= 1:
+            raise ValueError("Cannot delete the last remaining brand in the catalog.")
+
+        # Remove file from disk
+        fpath = os.path.join(DATA_DIR, f"{brand_id}.json")
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+                logger.info(f"Deleted brand file {fpath}")
+            except Exception as e:
+                logger.error(f"Failed to remove brand file {fpath}: {e}")
+
+        # Remove from in-memory cache
+        del cls._brands[brand_id]
+
+        # If active brand was deleted, switch to another brand
+        if cls._active_brand_id == brand_id:
+            new_active = "mahindra" if "mahindra" in cls._brands else next(iter(cls._brands.keys()))
+            cls.set_active_brand(new_active)
+
+        cache.invalidate()
+        return True
+
 
     @classmethod
     def _save_to_disk(cls, brand: BrandCatalog):

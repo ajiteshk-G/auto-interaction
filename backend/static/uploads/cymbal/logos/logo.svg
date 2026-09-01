@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 54" width="220" height="54">
+  <defs>
+    <linearGradient id="crestGrad_cymbal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#007bff" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+  <!-- Modern Geometric Automotive Crest -->
+  <polygon points="8,14 32,8 44,24 28,38 6,24" fill="url(#crestGrad_cymbal)" stroke="#007bff" stroke-width="1.5" />
+  <polygon points="24,22 38,18 46,28 34,40 20,32" fill="#007bff" opacity="0.35" />
+  <polyline points="4,28 18,44 48,16" fill="none" stroke="#007bff" stroke-width="2.5" stroke-linecap="round" />
+  <!-- Monogram -->
+  <text x="26" y="27" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" text-anchor="middle" letter-spacing="1">C</text>
+  <!-- Brand Display Name -->
+  <text x="56" y="28" fill="#0f172a" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="15" letter-spacing="1.5">CYMBAL</text>
+  <text x="56" y="41" fill="#007bff" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="7.5" letter-spacing="2.5">INTELLIGENT PERFORMANCE</text>
+</svg>

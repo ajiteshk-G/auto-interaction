@@ -13,6 +13,7 @@ class OutboundCallTriggerRequest(BaseModel):
     dealership_name: Optional[str] = Field(default=None)
     advisor_name: str = Field(default="Rajesh Varma")
     call_channel: Optional[str] = Field(default="BROWSER_GEMINI_LIVE")
+    brand_id: Optional[str] = Field(default=None, description="Brand ID, e.g. mahindra, bmw, hyundai, maruti_suzuki")
 
 class OutboundDialogueTurnRequest(BaseModel):
     call_reference: str = Field(..., description="Call Reference ID")
@@ -36,6 +37,7 @@ class OutboundCallInsightsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     call_reference: str
+    brand_id: Optional[str] = None
     customer_id: Any
     customer_name: str
     agent_name: str

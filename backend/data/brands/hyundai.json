@@ -2,25 +2,27 @@
   "id": "hyundai",
   "name": "Hyundai Motor India",
   "tagline": "New Thinking. New Possibilities \u2014 Smart Mobility for Tomorrow",
-  "logo_url": "https://www.hyundai.com/content/dam/hyundai/ww/en/images/common/logo.png",
+  "logo_url": "/assets/hyundai-logo.svg",
   "primary_color": "#002c5f",
   "secondary_color": "#0a192f",
   "accent_color": "#00aad2",
-  "avatar_name": "Aria",
+  "avatar_name": "Kavya",
   "avatar_voice": "Aoede",
   "source_urls": [
     "https://www.hyundai.com/in/en",
-    "https://www.hyundai.com/in/en/find-a-car/ioniq-5"
+    "https://www.hyundai.com/in/en/find-a-car/ioniq-5",
+    "https://www.hyundai.com/in/en/find-a-car/creta",
+    "https://www.hyundai.com/in/en/find-a-car/verna"
   ],
   "is_active": false,
   "vehicles": [
     {
       "id": "ioniq_5",
       "name": "Hyundai IONIQ 5",
-      "tagline": "Custom Verified Source of Truth Tagline",
+      "tagline": "Power Your World \u2014 800V Ultra-Fast Charging Electric CUV",
       "category": "Born Electric SUV",
-      "price_range": "\u20b948.00 Lakh",
-      "hero_image": "/uploads/hyundai/vehicles/ioniq_5_1788249211.png",
+      "price_range": "\u20b946.05 Lakh - \u20b948.00 Lakh (Ex-Showroom)",
+      "hero_image": "/assets/hyundai-ioniq5.jpg",
       "engine_specs": "Permanent Magnet Synchronous Motor (217 PS / 350 Nm)",
       "seating_capacity": "5-Seater Lounge Cabin",
       "fuel_or_battery": "72.6 kWh Battery (350 kW DC Fast Charge)",
@@ -47,8 +49,8 @@
           ]
         }
       ],
-      "is_custom_source_of_truth": true,
-      "uploaded_image_url": "/uploads/hyundai/vehicles/ioniq_5_1788249211.png"
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
     },
     {
       "id": "creta",
@@ -56,7 +58,7 @@
       "tagline": "Undisputed. Ultimate. The Leader of Indian Roads",
       "category": "Authentic SUV",
       "price_range": "\u20b911.00 Lakh - \u20b920.15 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/141115/creta-exterior-right-front-three-quarter-16.jpeg",
+      "hero_image": "/assets/hyundai-creta.jpg",
       "engine_specs": "1.5L Turbo GDi Petrol (160 PS) & 1.5L U2 CRDi Diesel (116 PS)",
       "seating_capacity": "5-Seater",
       "fuel_or_battery": "Petrol / Diesel (6-Speed MT / IVT / 7-Speed DCT / 6-Speed AT)",
@@ -104,7 +106,7 @@
       "tagline": "Next-Level Premium Flagship SUV with Visionary Design",
       "category": "Tech SUV",
       "price_range": "\u20b929.02 Lakh - \u20b935.94 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/106815/tucson-exterior-right-front-three-quarter-4.jpeg",
+      "hero_image": "/assets/hyundai-tucson.jpg",
       "engine_specs": "2.0L Nu Petrol (156 PS) & 2.0L R-Series Diesel (186 PS / 416 Nm)",
       "seating_capacity": "5-Seater Flagship",
       "fuel_or_battery": "Petrol (6-Speed AT) / Diesel (8-Speed AT / HTRAC AWD)",
@@ -140,7 +142,7 @@
       "tagline": "Live the Lit Life \u2014 Smart Urban Connected SUV",
       "category": "Tech SUV",
       "price_range": "\u20b97.94 Lakh - \u20b913.48 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/124113/venue-exterior-right-front-three-quarter.jpeg",
+      "hero_image": "/assets/hyundai-venue.png",
       "engine_specs": "1.0L Turbo GDi (120 PS / 172 Nm) & 1.5L Diesel (116 PS)",
       "seating_capacity": "5-Seater Urban",
       "fuel_or_battery": "Petrol / Diesel (MT / 7-Speed DCT)",
@@ -163,6 +165,55 @@
             "Sunroof",
             "Connected Car Tech",
             "Air Purifier"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "verna",
+      "name": "Hyundai Verna (6th Gen Turbo)",
+      "tagline": "Futuristic. Ferocious. Fastback Sedan with 160 PS Turbo GDi",
+      "category": "Tech SUV",
+      "price_range": "\u20b911.00 Lakh - \u20b917.42 Lakh (Ex-Showroom)",
+      "hero_image": "/assets/hyundai-verna.jpg",
+      "engine_specs": "1.5L Turbo GDi Petrol (160 PS / 253 Nm) & 1.5L MPi Petrol (115 PS)",
+      "seating_capacity": "5-Seater Executive Fastback",
+      "fuel_or_battery": "Petrol (6-Speed MT / IVT / 7-Speed DCT)",
+      "range_or_mileage": "20.6 km/l (DCT) / 20.0 km/l (MT)",
+      "key_highlights": [
+        "Hyundai SmartSense Level 2 ADAS with 17 Safety & Collision Avoidance Features",
+        "Full-Width Horizon LED Positioning Lamp & Parametric Connected LED Tail Lamps",
+        "Switchable Type Controller for Integrated Infotainment & Climate Control",
+        "Front Heated and Ventilated Seats & 64-Color Ambient Mood Lighting",
+        "Bose Premium 8-Speaker Audio System with Dynamic Speed Compensation"
+      ],
+      "usp": "Aerodynamic fastback sedan with best-in-class 160PS turbo punch and Level 2 ADAS safety.",
+      "variants": [
+        {
+          "name": "SX (O) 1.5 Turbo DCT",
+          "price_ex_showroom": "\u20b917.42 Lakh",
+          "engine_or_battery": "1.5L Turbo GDi (160 PS / 253 Nm)",
+          "transmission": "7-Speed Dual Clutch Transmission (DCT)",
+          "key_features": [
+            "Level 2 ADAS",
+            "Bose 8-Speaker Audio",
+            "Heated & Ventilated Seats",
+            "Paddle Shifters",
+            "Smart Electric Sunroof"
+          ]
+        },
+        {
+          "name": "SX 1.5 MPi IVT",
+          "price_ex_showroom": "\u20b914.33 Lakh",
+          "engine_or_battery": "1.5L MPi Petrol (115 PS / 144 Nm)",
+          "transmission": "Intelligent Variable Transmission (IVT)",
+          "key_features": [
+            "Electric Sunroof",
+            "Dual 10.25-inch Screens",
+            "Rear Camera",
+            "Ambient Lighting"
           ]
         }
       ],

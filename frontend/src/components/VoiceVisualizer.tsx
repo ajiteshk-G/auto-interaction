@@ -36,7 +36,7 @@ export function VoiceVisualizer({
 
         <div className="flex items-center gap-1.5 bg-slate-800/90 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700 text-[10px] font-bold text-red-400">
           <Activity className="w-3 h-3 text-red-400 animate-pulse" />
-          <span>Kabir (Native Live Audio)</span>
+          <span>Kavya (Native Live Audio)</span>
         </div>
       </div>
 
@@ -50,13 +50,13 @@ export function VoiceVisualizer({
             style={{ opacity: isRecording ? glowOpacity : 0.3 }}
           />
 
-          {/* Kabir Persona Avatar Representation */}
+          {/* Kavya Persona Avatar Representation */}
           <div className="relative flex flex-col items-center justify-center space-y-1">
             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-red-700 to-red-500 flex items-center justify-center text-white font-black text-2xl shadow-lg border-2 border-white/40">
               K
             </div>
             <div className="text-[11px] font-black uppercase tracking-wider text-slate-200">
-              Kabir • AI Specialist
+              Kavya • AI Specialist
             </div>
           </div>
 
@@ -107,7 +107,7 @@ export function VoiceVisualizer({
           </span>
         </div>
         <p className="text-[11px] text-slate-400 max-w-sm">
-          Vertex AI Gemini 2.5 real-time bidirectional audio consultation with Kabir showroom persona
+          Vertex AI Gemini 2.5 real-time bidirectional audio consultation with Kavya showroom persona
         </p>
       </div>
     </div>

@@ -14,10 +14,11 @@ router = APIRouter(prefix="/sales", tags=["Sales Advisor Mobile App & Test Ride"
 @router.get("/leads", response_model=List[TestRideLeadItem])
 async def get_sales_leads(
     dealership_id: Optional[str] = None,
+    brand_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """Fetch qualified leads from Pre-sales virtual showroom for the Sales Mobile App, optionally filtered by showroom."""
-    return await SalesRecordingService.get_sales_leads(db, dealership_id=dealership_id)
+    """Fetch qualified leads from Pre-sales virtual showroom for the Sales Mobile App, optionally filtered by showroom and brand."""
+    return await SalesRecordingService.get_sales_leads(db, dealership_id=dealership_id, brand_id=brand_id)
 
 @router.post("/test-ride/upload-recording", response_model=TestRideInsightResponse)
 async def upload_test_ride_recording(
@@ -33,6 +34,7 @@ async def get_latest_test_ride(
     customer_id: Optional[str] = None,
     booking_reference: Optional[str] = None,
     phone: Optional[str] = None,
+    brand_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Retrieve the latest persisted AI insights for a customer or booking reference."""
@@ -40,7 +42,8 @@ async def get_latest_test_ride(
         db,
         customer_id=customer_id,
         booking_reference=booking_reference,
-        phone=phone
+        phone=phone,
+        brand_id=brand_id
     )
     return insights
 
@@ -56,5 +59,8 @@ async def get_test_ride_insights(
     return insights
 
 @router.get("/test-ride/all", response_model=List[TestRideInsightResponse])
-async def get_all_test_rides(db: AsyncSession = Depends(get_db)):
-    return await SalesRecordingService.get_all_test_rides(db)
+async def get_all_test_rides(
+    brand_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    return await SalesRecordingService.get_all_test_rides(db, brand_id=brand_id)

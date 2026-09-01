@@ -28,14 +28,14 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-black tracking-tight text-slate-900 uppercase">
-                  Mahindra Omnichannel Admin Portal
+                  Omnichannel Multi-Brand Admin Portal
                 </h1>
                 <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-mono text-[9.5px] font-bold border border-red-200">
                   Live Operations
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Booked Test Rides • Dual Transcripts (Pre-Sales &amp; Test Ride) • Twilio SMS Dispatch
+                Booked Test Rides • Dual Transcripts (Pre-Sales &amp; Test Ride) • Multi-Tenant Brand Registry
               </p>
             </div>
           </div>

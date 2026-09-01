@@ -6,6 +6,7 @@ class Dealership(Base):
     __tablename__ = "dealerships"
 
     id = Column(String(64), primary_key=True, index=True) # e.g. "mumbai_nbs_chowpatty"
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     name = Column(String(128), nullable=False) # "Mahindra NBS International Ltd - Chowpatty"
     city = Column(String(64), index=True, nullable=False) # "Mumbai", "Pune", "Delhi", "Bangalore", "Chennai"
     state = Column(String(64), nullable=False) # "Maharashtra", "Delhi", "Karnataka", "Tamil Nadu"

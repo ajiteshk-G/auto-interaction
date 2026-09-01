@@ -7,11 +7,13 @@ import {
   fetchActiveBrand,
   setActiveBrand,
   onboardBrand,
+  deleteBrand,
   uploadVehicleImage,
   uploadBrandLogo,
   updateVehicleDetails,
   addCustomVehicle,
-  deleteCustomVehicle
+  deleteCustomVehicle,
+  generateVehicleImage
 } from "@/lib/api";
 import {
   X,
@@ -60,6 +62,7 @@ export function BrandStudioModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingVehicleId, setUploadingVehicleId] = useState<string | null>(null);
+  const [generatingVehicleId, setGeneratingVehicleId] = useState<string | null>(null);
 
   // Load brands on open
   useEffect(() => {
@@ -133,10 +136,6 @@ export function BrandStudioModal({
       setStatusMessage({ type: "error", text: "Please provide a brand name" });
       return;
     }
-    if (validUrls.length === 0) {
-      setStatusMessage({ type: "error", text: "Please provide at least one valid URL" });
-      return;
-    }
 
     setIsOnboarding(true);
     setStatusMessage(null);
@@ -147,7 +146,7 @@ export function BrandStudioModal({
         onBrandChanged(onboarded);
         setStatusMessage({
           type: "success",
-          text: `Successfully extracted ${onboarded.vehicles.length} vehicles for ${onboarded.name}!`
+          text: `Successfully created and seeded ${onboarded.vehicles.length} vehicles for ${onboarded.name}!`
         });
         const allBrands = await fetchBrands();
         setBrands(allBrands);
@@ -156,7 +155,7 @@ export function BrandStudioModal({
     } catch (e: any) {
       setStatusMessage({
         type: "error",
-        text: `Extraction failed: ${e.message || "Could not crawl URLs"}`
+        text: `Extraction failed: ${e.message || "Could not onboard brand"}`
       });
     } finally {
       setIsOnboarding(false);
@@ -198,6 +197,33 @@ export function BrandStudioModal({
     }
   };
 
+  const handleGenerateAiImage = async (vehicleId: string) => {
+    if (!activeBrand) return;
+    setGeneratingVehicleId(vehicleId);
+    setStatusMessage(null);
+    try {
+      const updatedVehicle = await generateVehicleImage(activeBrand.id, vehicleId);
+      if (updatedVehicle) {
+        const refreshedBrand = await fetchActiveBrand();
+        if (refreshedBrand) {
+          setActiveBrandState(refreshedBrand);
+          onBrandChanged(refreshedBrand);
+        }
+        setStatusMessage({
+          type: "success",
+          text: `Generated realistic road car design for ${updatedVehicle.name} using Gemini AI!`
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: `AI image generation failed: ${err.message || "Please try again"}`
+      });
+    } finally {
+      setGeneratingVehicleId(null);
+    }
+  };
+
   const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeBrand) return;
@@ -229,6 +255,27 @@ export function BrandStudioModal({
         setActiveBrandState(refreshedBrand);
         onBrandChanged(refreshedBrand);
       }
+    }
+  };
+
+  const handleDeleteBrand = async (brandId: string, brandName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to delete ${brandName} and all its vehicles from the system?`)) return;
+    setIsLoading(true);
+    setStatusMessage(null);
+    try {
+      const activeBrandAfter = await deleteBrand(brandId);
+      if (activeBrandAfter) {
+        setActiveBrandState(activeBrandAfter);
+        onBrandChanged(activeBrandAfter);
+      }
+      const updatedBrands = await fetchBrands();
+      setBrands(updatedBrands);
+      setStatusMessage({ type: "success", text: `Successfully deleted ${brandName} and its vehicles.` });
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err.message || "Failed to delete brand." });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -330,14 +377,25 @@ export function BrandStudioModal({
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <span
-                            className="w-3 h-3 rounded-full shrink-0"
-                            style={{ backgroundColor: b.primary_color }}
-                          />
-                          {isSelected && (
-                            <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">
-                              ACTIVE
-                            </span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: b.primary_color }}
+                            />
+                            {isSelected && (
+                              <span className="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          {brands.length > 1 && (
+                            <button
+                              onClick={(e) => handleDeleteBrand(b.id, b.name, e)}
+                              title={`Delete ${b.name} and all its vehicles`}
+                              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                         <h4 className="text-sm font-black text-slate-900">{b.name}</h4>
@@ -375,11 +433,10 @@ export function BrandStudioModal({
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-1">
                 <p className="font-bold text-slate-900 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  Automated Multi-URL Ingestion & Extraction Engine
+                  Automated Multi-URL Ingestion & AI Fictional Brand Synthesis
                 </p>
                 <p>
-                  Provide the brand name and one or more official URLs (e.g. homepage, SUV lineup, EV showcase, or model spec pages).
-                  Gemini will crawl the pages, extract logo assets, vehicle photos, powertrains, and prices, and build the catalog automatically.
+                  Provide a real automotive brand name with official URLs to scrape, or <strong>leave the URLs blank</strong> for any brand (e.g. <em>Apex Hypercars, CyberMotors, Quantum EV</em>). Gemini will synthesize an imaginative, high-performance vehicle catalog with verified high-resolution images, specifications, and auto-seeded CRM data!
                 </p>
               </div>
 
@@ -389,7 +446,7 @@ export function BrandStudioModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. BMW, Tata Motors, Rivian, Porsche, Kia"
+                  placeholder="e.g. BMW, Porsche, CyberMotors, Apex Hypercars, Quantum EV"
                   value={newBrandName}
                   onChange={(e) => setNewBrandName(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 shadow-xs"
@@ -399,18 +456,17 @@ export function BrandStudioModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Brand URLs to Scrape (Multiple URLs Supported) *
+                  Brand URLs to Scrape (Optional - Leave blank for AI generated fictional brand)
                 </label>
                 <div className="space-y-2">
                   {newUrls.map((url, idx) => (
                     <div key={idx} className="flex items-center gap-2">
                       <input
                         type="url"
-                        placeholder="https://brand.com/vehicles or https://brand.com/suvs"
+                        placeholder="https://brand.com/vehicles (Optional: leave empty for AI generated brand)"
                         value={url}
                         onChange={(e) => handleUrlChange(idx, e.target.value)}
                         className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-indigo-600 shadow-xs"
-                        required={idx === 0}
                       />
                       {newUrls.length > 1 && (
                         <button
@@ -450,12 +506,16 @@ export function BrandStudioModal({
                   {isOnboarding ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Crawling URLs & Extracting with AI...
+                      {newUrls.some((u) => u.trim())
+                        ? "Crawling URLs & Extracting with AI..."
+                        : "Synthesizing Fictional Brand & Lineup with AI..."}
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      Analyze & Extract Brand Catalog
+                      {newUrls.some((u) => u.trim())
+                        ? "Analyze & Extract Brand Catalog"
+                        : "Create Brand & Auto-Generate with AI"}
                     </>
                   )}
                 </button>
@@ -535,6 +595,11 @@ export function BrandStudioModal({
                             src={v.hero_image}
                             alt={v.name}
                             className="w-full h-full object-contain p-2"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "/assets/placeholder-car.svg";
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
@@ -546,9 +611,9 @@ export function BrandStudioModal({
                         {/* Source of Truth Badge */}
                         <div className="absolute top-2 left-2">
                           {v.is_custom_source_of_truth ? (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Source of Truth
+                            <span className="px-2 py-0.5 rounded-full bg-purple-600 text-white text-[10px] font-bold shadow-xs flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-yellow-300" />
+                              Source of Truth (AI Generated)
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full bg-slate-800/80 text-white text-[10px] font-medium backdrop-blur-xs">
@@ -557,15 +622,33 @@ export function BrandStudioModal({
                           )}
                         </div>
 
-                        {/* Hover upload button */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        {/* Hover action overlay */}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateAiImage(v.id)}
+                            disabled={generatingVehicleId === v.id}
+                            className="w-full max-w-[210px] px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                          >
+                            {generatingVehicleId === v.id ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Generating Design...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                                <span>Generate Realistic AI Car</span>
+                              </>
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => triggerVehicleImageUpload(v.id)}
-                            className="px-3 py-1.5 rounded-xl bg-white text-slate-900 text-xs font-bold shadow-lg flex items-center gap-1 hover:bg-slate-100 transition-colors"
+                            className="w-full max-w-[210px] px-3 py-1.5 rounded-xl bg-white text-slate-900 text-xs font-bold shadow-lg flex items-center justify-center gap-1.5 hover:bg-slate-100 transition-colors"
                           >
                             <Upload className="w-3.5 h-3.5 text-indigo-600" />
-                            Upload Image (Source of Truth)
+                            <span>Upload Custom File</span>
                           </button>
                         </div>
                       </div>
@@ -601,14 +684,35 @@ export function BrandStudioModal({
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => triggerVehicleImageUpload(v.id)}
-                        className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Replace Image
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateAiImage(v.id)}
+                          disabled={generatingVehicleId === v.id}
+                          className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {generatingVehicleId === v.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                              <span className="animate-pulse">Generating Nano Banana...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                              <span>Generate AI Concept</span>
+                            </>
+                          )}
+                        </button>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => triggerVehicleImageUpload(v.id)}
+                          className="text-xs font-bold text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-1"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-slate-500" />
+                          Upload
+                        </button>
+                      </div>
                       <span className="text-[10px] text-slate-400 font-mono">
                         ID: {v.id}
                       </span>

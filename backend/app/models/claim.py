@@ -8,6 +8,7 @@ class InsuranceClaim(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     claim_id = Column(String(64), unique=True, index=True, nullable=False) # e.g. "MH-INS-99201"
+    brand_id = Column(String(64), index=True, default="mahindra", nullable=False)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     
     vin = Column(String(64), nullable=False)

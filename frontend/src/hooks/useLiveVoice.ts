@@ -13,8 +13,10 @@ export interface LiveMessage {
   language?: string;
 }
 
-export const KABIR_AUDIO_GREETING =
-  "Namaste! Welcome to Mahindra Virtual Showroom. I am Kabir, your AI Showroom Specialist. Ask me anything about our SUV lineup or speak with me in your preferred language!";
+export const KAVYA_AUDIO_GREETING =
+  "Namaste! Welcome to our Virtual Showroom. I am Kavya, your AI Showroom Specialist. Ask me anything about our vehicles or speak with me in your preferred language!";
+
+export const KABIR_AUDIO_GREETING = KAVYA_AUDIO_GREETING;
 
 export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const [isConnected, setIsConnected] = useState(true);
@@ -34,10 +36,13 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const customerInfoRef = useRef<{ name?: string; phone?: string; customer_id?: string; vehicle_id?: string }>({});
   const audioOutputManagerRef = useRef<LiveAudioOutputManager | null>(null);
   const videoOutputManagerRef = useRef<LiveVideoOutputManager | null>(null);
+  const isAssistantSpeakingRef = useRef(false);
+  const hasGreetedRef = useRef(false);
 
   useEffect(() => {
     const audioMgr = new LiveAudioOutputManager();
     audioMgr.onPlaybackStateChange = (playing) => {
+      isAssistantSpeakingRef.current = playing;
       setIsAssistantSpeaking(playing);
       if (playing) {
         setRmsLevel(0.45);
@@ -47,6 +52,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     };
     audioOutputManagerRef.current = audioMgr;
     videoOutputManagerRef.current = new LiveVideoOutputManager();
+
+    return () => {
+      audioMgr.interrupt();
+    };
   }, []);
 
   const playAudioGreeting = useCallback(async (customGreeting?: string, customerName?: string) => {
@@ -58,7 +67,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       socketRef.current.send(
         JSON.stringify({
           type: "USER_CHAT",
-          text: `Greet the customer ${customerName || "there"} as Kabir.`
+          text: `Greet the customer ${customerName || "there"} as Kavya.`
         })
       );
     }
@@ -101,6 +110,13 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       ) {
         return;
       }
+      try {
+        socketRef.current.onmessage = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onclose = null;
+        socketRef.current.close();
+      } catch (e) {}
+      socketRef.current = null;
     }
 
     const wsUrl = getWebSocketUrl();
@@ -131,6 +147,9 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           } else if (payload.type === "SESSION_INIT" || payload.type === "SESSION_INITIALIZED") {
             if (payload.session_id) sessionIdRef.current = payload.session_id;
           } else if (payload.type === "USER_TRANSCRIPTION" && payload.message) {
+            if (onUiEventRef.current) {
+              onUiEventRef.current({ type: "USER_SPEECH_TEXT", text: payload.message });
+            }
             setMessages((prev) => {
               if (prev.length > 0) {
                 const lastMsg = prev[prev.length - 1];
@@ -254,8 +273,14 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     connectWebSocket();
     return () => {
       if (socketRef.current) {
+        socketRef.current.onmessage = null;
+        socketRef.current.onerror = null;
+        socketRef.current.onclose = null;
         socketRef.current.close();
         socketRef.current = null;
+      }
+      if (audioOutputManagerRef.current) {
+        audioOutputManagerRef.current.interrupt();
       }
     };
   }, [connectWebSocket]);
@@ -386,6 +411,15 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           const { pcm16, rms } = e.data;
           // Only send mic packets when WebSocket is open
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            // Echo cancellation gate: when assistant is speaking through speakers,
+            // ignore low acoustic mic feedback to prevent Gemini Live from responding to itself
+            if (isAssistantSpeakingRef.current && rms < 0.10) {
+              return;
+            }
+            if (isAssistantSpeakingRef.current && rms >= 0.10) {
+              // Deliberate user barge-in: silence assistant immediately
+              audioOutputManagerRef.current?.interrupt();
+            }
             socketRef.current.send(pcm16);
           }
         };
@@ -399,13 +433,22 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
         processor.onaudioprocess = (e) => {
           const inputData = e.inputBuffer.getChannelData(0);
+          let sum = 0;
           const pcm16 = new Int16Array(inputData.length);
           for (let i = 0; i < inputData.length; i++) {
             const s = Math.max(-1, Math.min(1, inputData[i]));
+            sum += s * s;
             pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
           }
+          const rms = Math.sqrt(sum / inputData.length);
 
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            if (isAssistantSpeakingRef.current && rms < 0.10) {
+              return;
+            }
+            if (isAssistantSpeakingRef.current && rms >= 0.10) {
+              audioOutputManagerRef.current?.interrupt();
+            }
             socketRef.current.send(pcm16.buffer);
           }
         };
@@ -416,8 +459,9 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
 // Native audio streaming only - No TTS / STT
 
-      // Trigger dynamic greeting from Kabir on starting live session if no messages yet
-      if (messages.length === 0) {
+      // Trigger dynamic greeting from Kavya on starting live session if no messages yet and not greeted yet
+      if (messages.length === 0 && !hasGreetedRef.current) {
+        hasGreetedRef.current = true;
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
           socketRef.current.send(
             JSON.stringify({
@@ -434,7 +478,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  message: `Please give a warm, dynamic, non-static spoken greeting to ${customerName || "there"} as Kabir, introducing yourself as Mahindra's AI Showroom Specialist.`,
+                  message: `Please give a warm, dynamic, non-static spoken greeting to ${customerName || "there"} as Kavya, introducing yourself as the brand's AI Showroom Specialist.`,
                   session_id: sessionIdRef.current,
                   language: activeLanguageRef.current
                 })
@@ -522,6 +566,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     }
     setIsRecording(false);
     setRmsLevel(0);
+    hasGreetedRef.current = false;
 
     // Flush and persist the entire conversation session transcript to SQLite database
     const currentMsgs = [...messages];

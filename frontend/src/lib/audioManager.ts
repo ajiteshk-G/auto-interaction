@@ -46,7 +46,9 @@ export class LiveAudioOutputManager {
       source.connect(this.audioContext.destination);
 
       const now = this.audioContext.currentTime;
-      if (this.nextPlayTime < now || this.nextPlayTime > now + 1.0) {
+      // If queue fell behind current time (underrun) or no audio sources are actively scheduled, start fresh at now.
+      // Crucial: Never reset nextPlayTime to now while chunks are actively playing/queued, as Gemini streams faster than real time.
+      if (this.activeSources.length === 0 || this.nextPlayTime < now || this.nextPlayTime > now + 30.0) {
         this.nextPlayTime = now;
       }
       const startTime = this.nextPlayTime;

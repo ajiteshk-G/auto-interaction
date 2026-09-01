@@ -3,10 +3,13 @@ import uuid
 import time
 import shutil
 import logging
+import asyncio
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
 from app.schemas.brand import (
     BrandCatalog,
     BrandSummary,
@@ -17,6 +20,8 @@ from app.schemas.brand import (
 from app.schemas.catalog import VehicleItem
 from app.services.brand_service import BrandService
 from app.services.brand_crawler_service import BrandCrawlerService
+from app.services.seed_generator_service import SeedGeneratorService
+from app.services.gemini_image_service import GeminiImageService
 
 logger = logging.getLogger("brand_router")
 router = APIRouter(prefix="/brands", tags=["Brand Management & Studio"])
@@ -57,25 +62,33 @@ async def get_brand(brand_id: str):
     return brand
 
 @router.post("/onboard", response_model=BrandCatalog)
-async def onboard_brand(req: BrandOnboardRequest):
+async def onboard_brand(req: BrandOnboardRequest, db: AsyncSession = Depends(get_db)):
     """
-    Onboard a brand by providing the brand name and one or more URLs.
-    Crawls pages, extracts logos/vehicles/specs/images with Gemini, and registers brand.
+    Onboard a brand by providing the brand name and optional URLs.
+    If no URLs are provided, synthesizes a complete brand catalog and vehicle lineup using Gemini.
+    Crawls pages (if provided), extracts logos/vehicles/specs/images with Gemini, registers brand,
+    and auto-creates rich omnichannel seed data in database.
     """
     if not req.brand_name.strip():
         raise HTTPException(status_code=400, detail="Brand name cannot be empty")
-    if not req.urls:
-        raise HTTPException(status_code=400, detail="At least one URL must be provided")
 
     try:
+        clean_urls = [u.strip() for u in (req.urls or []) if u and u.strip()]
         catalog = await BrandCrawlerService.crawl_and_extract_catalog(
-            brand_name=req.brand_name,
-            urls=req.urls
+            brand_name=req.brand_name.strip(),
+            urls=clean_urls
         )
         saved = BrandService.onboard_or_save_brand(catalog, set_active=True)
+
+        # Auto-create rich omnichannel seed data in Cloud SQL database for the brand in background
+        try:
+            asyncio.create_task(SeedGeneratorService.seed_data_for_brand_background(saved))
+        except Exception as se:
+            logger.warning(f"Notice: Auto-seed for brand {saved.name} encountered an issue: {se}")
+
         return saved
     except Exception as e:
-        logger.error(f"Failed to onboard brand {req.brand_name}: {e}")
+        logger.error(f"Failed to onboard brand {req.brand_name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to onboard brand: {str(e)}")
 
 @router.post("/{brand_id}/upload-vehicle-image", response_model=VehicleItem)
@@ -113,6 +126,46 @@ async def upload_vehicle_image(
     updated_v = BrandService.update_vehicle_image(brand_id, vehicle_id, public_url)
     if not updated_v:
         raise HTTPException(status_code=404, detail=f"Vehicle '{vehicle_id}' not found in brand '{brand_id}'")
+
+    return updated_v
+
+class GenerateVehicleImageRequest(BaseModel):
+    styling_notes: Optional[str] = None
+    prompt_override: Optional[str] = None
+
+@router.post("/{brand_id}/vehicles/{vehicle_id}/generate-image", response_model=VehicleItem)
+async def generate_vehicle_image(
+    brand_id: str,
+    vehicle_id: str,
+    req: GenerateVehicleImageRequest = Body(default_factory=GenerateVehicleImageRequest)
+):
+    """
+    Generates a photorealistic, non-proprietary concept vehicle image using Gemini
+    (Nano Banana / gempix-1) and sets it as the vehicle's Source of Truth hero image.
+    """
+    brand = BrandService.get_brand(brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail=f"Brand '{brand_id}' not found")
+
+    target_vehicle = next((v for v in brand.vehicles if v.id.lower() == vehicle_id.lower()), None)
+    if not target_vehicle:
+        raise HTTPException(status_code=404, detail=f"Vehicle '{vehicle_id}' not found in brand '{brand_id}'")
+
+    url = await GeminiImageService.generate_concept_car_image(
+        brand_id=brand_id,
+        vehicle_id=vehicle_id,
+        vehicle_name=target_vehicle.name,
+        category=target_vehicle.category,
+        styling_notes=req.styling_notes or target_vehicle.usp or (target_vehicle.key_highlights[0] if target_vehicle.key_highlights else None),
+        prompt_override=req.prompt_override
+    )
+
+    if not url:
+        raise HTTPException(status_code=500, detail="Failed to generate concept car image with Gemini")
+
+    updated_v = BrandService.update_vehicle_image(brand_id, vehicle_id, url)
+    if not updated_v:
+        raise HTTPException(status_code=500, detail="Failed to update vehicle record with generated image")
 
     return updated_v
 
@@ -155,12 +208,19 @@ async def update_vehicle(brand_id: str, vehicle_id: str, req: VehicleUpdateReque
     return updated
 
 @router.post("/{brand_id}/vehicles", response_model=VehicleItem)
-async def add_vehicle(brand_id: str, vehicle: VehicleItem):
-    """Manually add a vehicle to the brand catalog."""
+async def add_vehicle(brand_id: str, vehicle: VehicleItem, db: AsyncSession = Depends(get_db)):
+    """Manually add a vehicle to the brand catalog and auto-seed database records for it."""
     vehicle.is_custom_source_of_truth = True
     added = BrandService.add_vehicle(brand_id, vehicle)
     if not added:
         raise HTTPException(status_code=404, detail=f"Brand '{brand_id}' not found")
+
+    try:
+        await SeedGeneratorService.seed_data_for_vehicle(db, brand_id, vehicle)
+        await db.commit()
+    except Exception as se:
+        logger.warning(f"Notice: Auto-seed for vehicle {vehicle.name} encountered an issue: {se}")
+
     return added
 
 @router.delete("/{brand_id}/vehicles/{vehicle_id}")
@@ -170,3 +230,19 @@ async def delete_vehicle(brand_id: str, vehicle_id: str):
     if not success:
         raise HTTPException(status_code=404, detail=f"Vehicle '{vehicle_id}' not found")
     return {"status": "deleted", "vehicle_id": vehicle_id}
+
+@router.delete("/{brand_id}")
+async def delete_brand(brand_id: str):
+    """Delete a brand and all its vehicles from the system."""
+    try:
+        success = BrandService.delete_brand(brand_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Brand '{brand_id}' not found")
+        active_brand = BrandService.get_active_brand()
+        return {"status": "deleted", "brand_id": brand_id, "active_brand": active_brand}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Failed deleting brand {brand_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

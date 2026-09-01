@@ -2,15 +2,16 @@
   "id": "maruti_suzuki",
   "name": "Maruti Suzuki (NEXA)",
   "tagline": "Create. Inspire. Experience Premium Mobility & Intelligent Hybrids",
-  "logo_url": "https://www.nexaexperience.com/assets/images/nexa-logo.png",
+  "logo_url": "/assets/maruti-logo.svg",
   "primary_color": "#1b2028",
   "secondary_color": "#0d1117",
   "accent_color": "#e11d48",
-  "avatar_name": "Karan",
-  "avatar_voice": "Fenrir",
+  "avatar_name": "Kavya",
+  "avatar_voice": "Aoede",
   "source_urls": [
     "https://www.nexaexperience.com",
-    "https://www.marutisuzuki.com"
+    "https://www.marutisuzuki.com",
+    "https://www.marutisuzuki.com/arena"
   ],
   "is_active": false,
   "vehicles": [
@@ -20,7 +21,7 @@
       "tagline": "Rule Every Road \u2014 Intelligent Electric Hybrid & AllGrip 4x4",
       "category": "Authentic SUV",
       "price_range": "\u20b910.87 Lakh - \u20b920.09 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/123185/grand-vitara-exterior-right-front-three-quarter-4.jpeg",
+      "hero_image": "/assets/maruti-grand-vitara.jpg",
       "engine_specs": "1.5L Intelligent Electric Hybrid (116 PS) & 1.5L K15C DualJet (103 PS)",
       "seating_capacity": "5-Seater Premium SUV",
       "fuel_or_battery": "Strong Hybrid (e-CVT) / Petrol (5-MT / 6-AT / AllGrip AWD)",
@@ -68,7 +69,7 @@
       "tagline": "The Shape of New \u2014 Aerodynamic Turbo Coupe SUV",
       "category": "Tech SUV",
       "price_range": "\u20b97.52 Lakh - \u20b913.04 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/130583/fronx-exterior-right-front-three-quarter-109.jpeg",
+      "hero_image": "/assets/maruti-fronx.jpg",
       "engine_specs": "1.0L K-Series Boosterjet Turbo (100 PS / 148 Nm) & 1.2L DualJet (90 PS)",
       "seating_capacity": "5-Seater Coupe SUV",
       "fuel_or_battery": "Petrol / Smart Hybrid (5-MT / 6-Speed AT with Paddle Shifters)",
@@ -105,7 +106,7 @@
       "tagline": "Pure Off-Road Heritage Since 1970 \u2014 Go Anywhere, Conquer Anything",
       "category": "Authentic SUV",
       "price_range": "\u20b912.74 Lakh - \u20b914.95 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/130589/jimny-exterior-right-front-three-quarter-72.jpeg",
+      "hero_image": "/assets/maruti-jimny.jpg",
       "engine_specs": "1.5L K15B Petrol with Idle Start-Stop (105 PS / 134 Nm)",
       "seating_capacity": "4-Seater Genuine 4x4",
       "fuel_or_battery": "Petrol (5-Speed MT / 4-Speed AT with 4x4 Low Range)",
@@ -141,7 +142,7 @@
       "tagline": "City Breaker \u2014 High Stance, Electric Sunroof & Connected Tech",
       "category": "Tech SUV",
       "price_range": "\u20b98.34 Lakh - \u20b914.14 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/107543/brezza-exterior-right-front-three-quarter-7.jpeg",
+      "hero_image": "/assets/maruti-brezza.png",
       "engine_specs": "1.5L K15C DualJet Smart Hybrid (103 PS / 137 Nm)",
       "seating_capacity": "5-Seater Compact SUV",
       "fuel_or_battery": "Petrol / Smart Hybrid (5-MT / 6-Speed AT)",
@@ -176,7 +177,7 @@
       "tagline": "The Grand Opulence \u2014 Luxury Strong Hybrid MPV",
       "category": "Authentic SUV",
       "price_range": "\u20b925.30 Lakh - \u20b929.02 Lakh (Ex-Showroom)",
-      "hero_image": "https://imgd.aeplcdn.com/664x374/n/cw/ec/151141/invicto-exterior-right-front-three-quarter.jpeg",
+      "hero_image": "/assets/maruti-invicto.png",
       "engine_specs": "2.0L Intelligent Electric Hybrid with High Output Motor (186 PS)",
       "seating_capacity": "7 / 8-Seater Ottoman Luxury Lounge",
       "fuel_or_battery": "Strong Hybrid (e-CVT)",
@@ -199,6 +200,55 @@
             "Ventilated Ottoman Seats",
             "Powered Tailgate",
             "360 Camera"
+          ]
+        }
+      ],
+      "is_custom_source_of_truth": false,
+      "uploaded_image_url": null
+    },
+    {
+      "id": "swift",
+      "name": "Maruti Suzuki Swift (Epic New)",
+      "tagline": "Taking the World by Storm \u2014 The All-New Z-Series Engine",
+      "category": "Tech SUV",
+      "price_range": "\u20b96.49 Lakh - \u20b99.64 Lakh (Ex-Showroom)",
+      "hero_image": "/assets/maruti-swift.jpg",
+      "engine_specs": "1.2L Z-Series 3-Cylinder Petrol (82 PS / 112 Nm)",
+      "seating_capacity": "5-Seater Sporty Hatchback",
+      "fuel_or_battery": "Petrol (5-MT / 5-Speed AMT)",
+      "range_or_mileage": "25.75 km/l (AMT) / 24.80 km/l (MT)",
+      "key_highlights": [
+        "All-New Z12E 1.2L 3-Cylinder Engine with 25.75 km/l mileage",
+        "6 Airbags Standard across all variants with ESP & Hill Hold",
+        "9-inch SmartPlay Pro+ Infotainment with Wireless Apple CarPlay & Android Auto",
+        "Wireless Phone Charging & Type-A + Type-C Fast USB Ports",
+        "Suzuki Connect with 40+ Connected Features & Remote AC Control"
+      ],
+      "usp": "India's favorite sporty car with 25.75 km/l efficiency, 6 airbags standard, and new Z-Series powertrain.",
+      "variants": [
+        {
+          "name": "ZXi+ AMT Dual Tone",
+          "price_ex_showroom": "\u20b99.64 Lakh",
+          "engine_or_battery": "1.2L Z-Series Petrol (82 PS / 112 Nm)",
+          "transmission": "5-Speed AMT",
+          "key_features": [
+            "6 Airbags Standard",
+            "9-inch SmartPlay Pro+",
+            "LED Projector Headlamps",
+            "Wireless Charger",
+            "Cruise Control"
+          ]
+        },
+        {
+          "name": "VXi 1.2L 5MT",
+          "price_ex_showroom": "\u20b97.29 Lakh",
+          "engine_or_battery": "1.2L Z-Series Petrol (82 PS / 112 Nm)",
+          "transmission": "5-Speed Manual",
+          "key_features": [
+            "6 Airbags Standard",
+            "ESP",
+            "All Power Windows",
+            "Steering Mounted Controls"
           ]
         }
       ],

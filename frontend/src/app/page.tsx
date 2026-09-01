@@ -22,8 +22,8 @@ import {
 import { Zap } from "lucide-react";
 
 export default function Home() {
-  const { profile, setProfile, loadProfile, setPhase } = useCustomerProfile();
   const [activeBrand, setActiveBrand] = useState<BrandCatalog | null>(null);
+  const { profile, setProfile, loadProfile, setPhase } = useCustomerProfile(undefined, activeBrand?.id);
   const [vehicles, setVehicles] = useState<VehicleItem[]>(DEFAULT_VEHICLES);
   const [dealerships, setDealerships] = useState<DealershipItem[]>([]);
   const [isBrandStudioOpen, setIsBrandStudioOpen] = useState(false);
@@ -31,13 +31,7 @@ export default function Home() {
   // Dynamic brand identities
   const brandName = activeBrand?.name ? activeBrand.name.replace(/\(.*\)/, "").trim() : "Mahindra";
   const primaryColor = activeBrand?.primary_color || "#d71920";
-  const agentName =
-    activeBrand?.agent_name ||
-    (brandName.toLowerCase().includes("hyundai")
-      ? "Aarav"
-      : brandName.toLowerCase().includes("maruti")
-      ? "Rohan"
-      : "Kabir");
+  const agentName = activeBrand?.agent_name || activeBrand?.avatar_name || "Kavya";
 
   // Active Omnichannel Stage
   const [activeStage, setActiveStage] = useState<
@@ -53,26 +47,63 @@ export default function Home() {
   // Global Chat modal state
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const normalizeToVehicleId = (key: string): string => {
-    const k = key.toLowerCase().replace(/[\s-_]+/g, "_");
-    if (k.includes("thar_roxx") || (k.includes("thar") && k.includes("roxx")) || k.includes("roxx")) return "thar_roxx";
-    if (k.includes("thar_3door") || k.includes("thar_3_door") || k === "thar") return "thar_3door";
-    if (k.includes("scorpio_n") || k.includes("scorpion") || k.includes("big_daddy")) return "scorpio_n";
-    if (k.includes("scorpio_classic") || k.includes("classic")) return "scorpio_classic";
-    if (k.includes("xuv700") || k.includes("xuv_700")) return "xuv700";
-    if (k.includes("xuv_3xo") || k.includes("3xo") || k.includes("xuv3xo") || k.includes("skyroof")) return "xuv_3xo";
-    if (k.includes("be_6e") || k.includes("be6e") || k.includes("be_6")) return "be_6e";
-    if (k.includes("xev_9e") || k.includes("xev9e") || k.includes("xev_9")) return "xev_9e";
-    if (k.includes("xuv400") || k.includes("xuv400_ev")) return "xuv400_ev";
-    if (k.includes("bolero_neo_plus") || k.includes("neo_plus") || k.includes("neo+")) return "bolero_neo_plus";
-    if (k.includes("bolero_neo") || k.includes("neo")) return "bolero_neo";
-    if (k.includes("bolero")) return "bolero";
-    if (k.includes("marazzo")) return "marazzo";
-    return k;
+  /**
+   * Generic vehicle matching across ALL vehicles in the active brand catalog.
+   * Matches IDs, full vehicle names, and distinct vehicle model keywords.
+   */
+  const matchVehicleFromText = (text: string, vehicleList: VehicleItem[]): VehicleItem | null => {
+    if (!text || !vehicleList || vehicleList.length === 0) return null;
+    const clean = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+
+    // 1. Direct ID check (exact or normalized)
+    for (const v of vehicleList) {
+      const vIdNorm = v.id.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const cleanTokens = clean.replace(/\s+/g, "");
+      if (cleanTokens.includes(vIdNorm) && vIdNorm.length >= 3) {
+        return v;
+      }
+    }
+
+    // 2. Sort vehicles by name length descending so specific longer names match first
+    const sortedVehicles = [...vehicleList].sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0));
+
+    // 3. Full vehicle name exact substring match
+    for (const v of sortedVehicles) {
+      const vName = v.name.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+      if (vName && clean.includes(vName)) {
+        return v;
+      }
+    }
+
+    // 4. Significant distinct token match (e.g. 'creta', 'vitara', 'fronx', 'jimny', 'roxx', 'scorpio', 'ioniq', 'brezza', 'swift')
+    for (const v of sortedVehicles) {
+      const tokens = v.name
+        .toLowerCase()
+        .split(/[\s-_]+/)
+        .filter((t) => t.length >= 3 && !["suv", "car", "all", "new", "the", "and", "edition", "door"].includes(t));
+      for (const token of tokens) {
+        const regex = new RegExp(`\\b${token}\\b`, "i");
+        if (regex.test(clean)) {
+          return v;
+        }
+      }
+    }
+
+    return null;
   };
 
   // Live Voice UI Actions Handler
   const handleUiEvent = (event: any) => {
+    // 1. User speech transcription broadcast (focus carousel in real-time as customer speaks)
+    if (event.type === "USER_SPEECH_TEXT" && event.text) {
+      const matched = matchVehicleFromText(event.text, vehicles);
+      if (matched && matched.id !== selectedVehicleId) {
+        setSelectedVehicleId(matched.id);
+        setActiveStage("presales");
+      }
+      return;
+    }
+
     const toolName = event.tool_name || event.toolCall || "";
     const args = event.tool_args || event.args || {};
     const rawCar = args.car_name || args.vehicle_id || args.model_of_interest || args.model_name || "";
@@ -80,8 +111,7 @@ export default function Home() {
     if (toolName === "book_test_drive") {
       setIsChatOpen(true);
       if (rawCar) {
-        const normId = normalizeToVehicleId(rawCar);
-        const matched = vehicles.find((v) => v.id === normId || v.name.toLowerCase().includes(rawCar.toLowerCase()));
+        const matched = matchVehicleFromText(rawCar, vehicles) || vehicles.find((v) => v.id === rawCar);
         if (matched) {
           setSelectedVehicleId(matched.id);
         }
@@ -90,8 +120,7 @@ export default function Home() {
     }
 
     if (toolName === "show_vehicle_spotlight" || toolName === "switch_vehicle_showroom" || rawCar) {
-      const normId = normalizeToVehicleId(rawCar || selectedVehicleId);
-      const matched = vehicles.find((v) => v.id === normId || v.name.toLowerCase().includes(rawCar.toLowerCase()));
+      const matched = (rawCar ? matchVehicleFromText(rawCar, vehicles) : null) || (rawCar ? vehicles.find((v) => v.id === rawCar) : null);
       if (matched) {
         setSelectedVehicleId(matched.id);
         setActiveStage("presales");
@@ -100,6 +129,19 @@ export default function Home() {
   };
 
   const liveVoice = useLiveVoice(handleUiEvent);
+
+  // Synchronize vehicle spotlight whenever customer speaks or types about a vehicle in live chat
+  useEffect(() => {
+    if (liveVoice.messages.length === 0) return;
+    const lastMsg = liveVoice.messages[liveVoice.messages.length - 1];
+    if (lastMsg.speaker === "customer" && lastMsg.text) {
+      const matched = matchVehicleFromText(lastMsg.text, vehicles);
+      if (matched && matched.id !== selectedVehicleId) {
+        setSelectedVehicleId(matched.id);
+        setActiveStage("presales");
+      }
+    }
+  }, [liveVoice.messages, vehicles, selectedVehicleId]);
 
   // Sync activeStage from URL parameters (e.g. ?stage=outbound_call)
   useEffect(() => {
@@ -218,6 +260,7 @@ export default function Home() {
             vehicles={vehicles}
             profile={profile}
             selectedVehicleId={selectedVehicleId}
+            brand={activeBrand}
             onProceedToOutboundCall={(insights) => {
               setTestRideInsights(insights);
               setActiveStage("outbound_call");
@@ -230,6 +273,7 @@ export default function Home() {
           <OutboundCallSimulator
             profile={profile}
             testRideInsights={testRideInsights}
+            brand={activeBrand}
           />
         )}
 
@@ -331,6 +375,9 @@ export default function Home() {
           if (newBrand.dealerships && newBrand.dealerships.length > 0) {
             setDealerships(newBrand.dealerships);
           }
+          if (profile?.phone) {
+            loadProfile(profile.phone, newBrand.id);
+          }
         }}
       />
 
@@ -339,9 +386,10 @@ export default function Home() {
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         profile={profile}
+        brand={activeBrand}
         onSetPhase={(phase) => setPhase(phase)}
         onRefresh={() => {
-          if (profile?.phone) loadProfile(profile.phone);
+          if (profile?.phone) loadProfile(profile.phone, activeBrand?.id);
         }}
       />
     </div>

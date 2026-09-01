@@ -2,7 +2,14 @@ import { DEFAULT_VEHICLES } from "./defaultCatalog";
 
 function getApiBase() {
   if (typeof window !== "undefined") {
-    // In browser, relative /api is proxied by Next.js rewrites to local backend
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    // Connect directly to local FastAPI backend on port 8000 when running in browser on localhost
+    // to bypass Next.js dev server's 30-second proxy timeout during AI catalog synthesis & web scraping
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://127.0.0.1:8000/api";
+    }
     return "/api";
   }
   return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
@@ -78,7 +85,17 @@ export async function onboardBrand(brandName: string, urls: string[]): Promise<B
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ brand_name: brandName, urls })
     });
-    if (!res.ok) throw new Error("Failed to onboard brand");
+    if (!res.ok) {
+      let errMsg = `Failed to onboard brand (${res.status})`;
+      try {
+        const errData = await res.json();
+        if (errData?.detail) errMsg = errData.detail;
+      } catch {
+        const text = await res.text().catch(() => "");
+        if (text) errMsg = `${errMsg}: ${text.slice(0, 150)}`;
+      }
+      throw new Error(errMsg);
+    }
     invalidateCatalogCache();
     cachedActiveBrand = await res.json();
     return cachedActiveBrand;
@@ -87,6 +104,26 @@ export async function onboardBrand(brandName: string, urls: string[]): Promise<B
     throw e;
   }
 }
+
+export async function deleteBrand(brandId: string): Promise<BrandCatalog | null> {
+  try {
+    const res = await fetch(`${API_BASE}/brands/${brandId}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.detail || `Failed to delete brand (${res.status})`);
+    }
+    invalidateCatalogCache();
+    const data = await res.json();
+    cachedActiveBrand = data.active_brand;
+    return cachedActiveBrand;
+  } catch (e) {
+    console.error("deleteBrand error:", e);
+    throw e;
+  }
+}
+
 
 export async function uploadVehicleImage(brandId: string, vehicleId: string, file: File): Promise<VehicleItem | null> {
   try {
@@ -103,6 +140,29 @@ export async function uploadVehicleImage(brandId: string, vehicleId: string, fil
     return await res.json();
   } catch (e) {
     console.error("uploadVehicleImage error:", e);
+    throw e;
+  }
+}
+
+export async function generateVehicleImage(
+  brandId: string,
+  vehicleId: string,
+  stylingNotes?: string
+): Promise<VehicleItem | null> {
+  try {
+    const res = await fetch(`${API_BASE}/brands/${brandId}/vehicles/${vehicleId}/generate-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ styling_notes: stylingNotes })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.detail || `Failed to generate image (${res.status})`);
+    }
+    invalidateCatalogCache();
+    return await res.json();
+  } catch (e) {
+    console.error("generateVehicleImage error:", e);
     throw e;
   }
 }
@@ -186,26 +246,31 @@ export async function fetchCatalog() {
   }
 }
 
-export async function fetchDealerships() {
-  if (cachedDealerships) return cachedDealerships;
+export async function fetchDealerships(city?: string, brandId?: string) {
+  const cacheKey = `${brandId || "default"}_${city || "all"}`;
+  if (cachedDealerships && cachedDealerships[cacheKey]) return cachedDealerships[cacheKey];
   try {
-    const res = await fetch(`${API_BASE}/catalog/dealerships`);
+    const q = new URLSearchParams();
+    if (city) q.set("city", city);
+    if (brandId) q.set("brand_id", brandId);
+    const res = await fetch(`${API_BASE}/catalog/dealerships?${q.toString()}`);
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
-      cachedDealerships = data;
+      if (!cachedDealerships) cachedDealerships = {};
+      cachedDealerships[cacheKey] = data;
       return data;
     }
     return data;
   } catch (err) {
     return [
       {
-        id: "bayview_bandra",
-        name: "Bayview Mahindra, Bandra West",
-        address: "Plot 14, Linking Road, Mumbai",
+        id: "flagship_showroom",
+        name: `${(brandId || "Official").toUpperCase()} Showroom`,
+        address: "Linking Road, Bandra West, Mumbai",
         city: "Mumbai",
         phone: "+91 22 2640 8899",
         rating: 4.9,
-        available_advisors: ["Rajesh Varma (Senior Specialist)", "Pooja Mehta"],
+        available_advisors: ["Official Brand Specialist"],
         has_test_drive_home_pickup: true
       }
     ];
@@ -218,6 +283,7 @@ export async function identifyCustomer(payload: {
   phone: string;
   session_type?: string;
   vehicle_id?: string;
+  brand_id?: string;
 }) {
   const res = await fetch(`${API_BASE}/customer/identify`, {
     method: "POST",
@@ -253,17 +319,23 @@ export async function fetchCustomerSessions(customerIdOrPhone: string) {
   return res.json();
 }
 
-export async function fetchCustomerProfile(customerId = "CUST-9820155432") {
+export async function fetchCustomerProfile(customerId = "CUST-9820155432", phone?: string, brandId?: string) {
   try {
-    const res = await fetch(`${API_BASE}/customer/profile?customer_id=${customerId}`);
+    const q = new URLSearchParams();
+    if (customerId) q.set("customer_id", customerId);
+    if (phone) q.set("phone", phone);
+    if (brandId) q.set("brand_id", brandId);
+    const res = await fetch(`${API_BASE}/customer/profile?${q.toString()}`);
     return await res.json();
   } catch (err) {
     return null;
   }
 }
 
-export async function updateCustomerPhase(phase: string, customerId = "CUST-9820155432") {
-  const res = await fetch(`${API_BASE}/customer/update-phase?customer_id=${customerId}&phase=${phase}`, {
+export async function updateCustomerPhase(phase: string, customerId = "CUST-9820155432", brandId?: string) {
+  const q = new URLSearchParams({ customer_id: customerId, phase });
+  if (brandId) q.set("brand_id", brandId);
+  const res = await fetch(`${API_BASE}/customer/update-phase?${q.toString()}`, {
     method: "POST"
   });
   return res.json();
@@ -279,8 +351,10 @@ export async function bookTestDrive(payload: any) {
 }
 
 // Stage 2: Sales Mobile App & Test Ride Recording (with SWR Cache)
-export async function fetchSalesLeads(dealershipId?: string) {
-  const key = dealershipId && dealershipId !== "ALL" ? dealershipId : "ALL";
+export async function fetchSalesLeads(dealershipId?: string, brandId?: string) {
+  const bKey = brandId || "default";
+  const dKey = dealershipId && dealershipId !== "ALL" ? dealershipId : "ALL";
+  const key = `${bKey}_${dKey}`;
   const now = Date.now();
   const existing = cachedLeadsByDealership.get(key);
 
@@ -289,9 +363,10 @@ export async function fetchSalesLeads(dealershipId?: string) {
   }
 
   try {
-    const url = dealershipId && dealershipId !== "ALL"
-      ? `${API_BASE}/sales/leads?dealership_id=${encodeURIComponent(dealershipId)}`
-      : `${API_BASE}/sales/leads`;
+    const q = new URLSearchParams();
+    if (dealershipId && dealershipId !== "ALL") q.set("dealership_id", dealershipId);
+    if (brandId) q.set("brand_id", brandId);
+    const url = `${API_BASE}/sales/leads?${q.toString()}`;
     const res = await fetch(url);
     const data = await res.json();
     if (Array.isArray(data)) {
@@ -322,12 +397,13 @@ export async function fetchTestRideInsights(sessionId: string) {
   return res.json();
 }
 
-export async function fetchLatestTestRideInsights(params?: { customer_id?: string; booking_reference?: string; phone?: string }) {
+export async function fetchLatestTestRideInsights(params?: { customer_id?: string; booking_reference?: string; phone?: string; brand_id?: string }) {
   try {
     const q = new URLSearchParams();
     if (params?.customer_id) q.set("customer_id", params.customer_id);
     if (params?.booking_reference) q.set("booking_reference", params.booking_reference);
     if (params?.phone) q.set("phone", params.phone);
+    if (params?.brand_id) q.set("brand_id", params.brand_id);
     const res = await fetch(`${API_BASE}/sales/test-ride/latest?${q.toString()}`);
     if (res.ok) {
       return await res.json();
@@ -338,8 +414,9 @@ export async function fetchLatestTestRideInsights(params?: { customer_id?: strin
   }
 }
 
-export async function fetchAllTestRides() {
-  const res = await fetch(`${API_BASE}/sales/test-ride/all`);
+export async function fetchAllTestRides(brandId?: string) {
+  const url = brandId ? `${API_BASE}/sales/test-ride/all?brand_id=${encodeURIComponent(brandId)}` : `${API_BASE}/sales/test-ride/all`;
+  const res = await fetch(url);
   return res.json();
 }
 
@@ -377,8 +454,9 @@ export async function assessDamage(payload: any) {
   return res.json();
 }
 
-export async function fileInsuranceClaim(payload: any) {
-  const res = await fetch(`${API_BASE}/diagnostics/claims`, {
+export async function fileInsuranceClaim(payload: any, brandId?: string) {
+  const url = brandId ? `${API_BASE}/diagnostics/claims?brand_id=${encodeURIComponent(brandId)}` : `${API_BASE}/diagnostics/claims`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -395,6 +473,7 @@ export async function saveFullSessionTranscript(payload: {
   customer_phone?: string;
   vehicle_id?: string;
   channel?: string;
+  brand_id?: string;
   messages: Array<{
     speaker: string;
     text: string;
@@ -417,13 +496,14 @@ export async function saveFullSessionTranscript(payload: {
 }
 
 
-export async function fetchAdminBookings(params?: { city?: string; vehicle_id?: string; status?: string; search?: string }) {
+export async function fetchAdminBookings(params?: { city?: string; vehicle_id?: string; status?: string; search?: string; brand_id?: string }) {
   try {
     const q = new URLSearchParams();
     if (params?.city) q.set("city", params.city);
     if (params?.vehicle_id) q.set("vehicle_id", params.vehicle_id);
     if (params?.status) q.set("status", params.status);
     if (params?.search) q.set("search", params.search);
+    if (params?.brand_id) q.set("brand_id", params.brand_id);
     const res = await fetch(`${API_BASE}/admin/bookings?${q.toString()}`);
     if (!res.ok) return [];
     return await res.json();
@@ -440,6 +520,7 @@ export async function saveOutboundCallTranscript(payload: {
   customer_name?: string;
   vehicle_name?: string;
   duration_seconds?: number;
+  brand_id?: string;
   turns: Array<{
     speaker: string;
     role?: string;

@@ -4,6 +4,7 @@ node_modules/
 !frontend/.next/standalone/node_modules/**
 **/.venv/
 **/*.db
+!backend/data/auto.db
 **/*.sqlite*
 **/*.log
 **/__pycache__/

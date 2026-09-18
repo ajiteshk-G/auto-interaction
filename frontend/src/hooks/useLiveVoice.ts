@@ -39,10 +39,16 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const hasGreetedRef = useRef(false);
   const isStartingRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const messagesRef = useRef<LiveMessage[]>([]);
+  const stopVoiceRecordingRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     const audioMgr = new LiveAudioOutputManager();
@@ -60,6 +66,24 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     return () => {
       audioMgr.interrupt();
     };
+  }, []);
+
+  const scheduleAutoEndCall = useCallback(() => {
+    (async () => {
+      // Wait for initial audio chunk to start playing
+      await new Promise((r) => setTimeout(r, 600));
+      // Wait while Kavya finishes speaking her goodbye (up to 8 seconds)
+      for (let i = 0; i < 40; i++) {
+        if (!isAssistantSpeakingRef.current) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await new Promise((r) => setTimeout(r, 400));
+      if (isRecordingRef.current) {
+        stopVoiceRecordingRef.current();
+      }
+    })();
   }, []);
 
   const playAudioGreeting = useCallback(async (customGreeting?: string, customerName?: string) => {
@@ -145,33 +169,58 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
             setRmsLevel(0.35 + Math.random() * 0.45);
           } else if (payload.type === "TURN_COMPLETE") {
             awaitingGreetingRef.current = false;
+          } else if (payload.type === "CALL_ENDED") {
+            awaitingGreetingRef.current = false;
+            scheduleAutoEndCall();
           } else if (payload.type === "INTERRUPTED") {
             awaitingGreetingRef.current = false;
             audioOutputManagerRef.current?.interrupt();
             setRmsLevel(0);
           } else if (payload.type === "SESSION_INIT" || payload.type === "SESSION_INITIALIZED") {
             if (payload.session_id) sessionIdRef.current = payload.session_id;
-          } else if (payload.type === "USER_TRANSCRIPTION" && payload.message) {
-            if (onUiEventRef.current) {
-              onUiEventRef.current({ type: "USER_SPEECH_TEXT", text: payload.message });
-            }
+          } else if (payload.type === "USER_TRANSCRIPTION" && (payload.turn_text || payload.message)) {
+            const cleanText = (payload.turn_text || payload.message || "").trim();
+            if (!cleanText) return;
+
             setMessages((prev) => {
+              const turnId = payload.turn_id;
+              if (turnId) {
+                const existingIdx = prev.findIndex((m) => m.id === turnId);
+                if (existingIdx !== -1) {
+                  const updated = [...prev];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    text: cleanText
+                  };
+                  return updated;
+                }
+                // Insert user turn BEFORE any active assistant turn that started in parallel
+                return [
+                  ...prev,
+                  {
+                    id: turnId,
+                    speaker: "customer",
+                    text: cleanText,
+                    timestamp: new Date().toLocaleTimeString()
+                  }
+                ];
+              }
+
               if (prev.length > 0) {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg.speaker === "customer") {
                   let newText = "";
-                  if (payload.message.startsWith(lastMsg.text)) {
-                    newText = payload.message;
-                  } else if (lastMsg.text.startsWith(payload.message)) {
+                  if (cleanText.startsWith(lastMsg.text)) {
+                    newText = cleanText;
+                  } else if (lastMsg.text.startsWith(cleanText)) {
                     newText = lastMsg.text;
                   } else {
-                    const sep = (lastMsg.text.endsWith(" ") || payload.message.startsWith(" ")) ? "" : " ";
-                    newText = lastMsg.text + sep + payload.message;
+                    newText = `${lastMsg.text} ${cleanText}`.trim();
                   }
                   const updated = [...prev];
                   updated[updated.length - 1] = {
                     ...lastMsg,
-                    text: newText.trim()
+                    text: newText
                   };
                   return updated;
                 }
@@ -181,36 +230,72 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
                 {
                   id: (Date.now() + Math.random()).toString(),
                   speaker: "customer",
-                  text: payload.message.trim(),
+                  text: cleanText,
                   timestamp: new Date().toLocaleTimeString()
                 }
               ];
             });
-          } else if (payload.type === "ASSISTANT_RESPONSE" && payload.message) {
+
+            if (onUiEventRef.current) {
+              try {
+                onUiEventRef.current({ type: "USER_SPEECH_TEXT", text: cleanText });
+              } catch (err) {
+                console.debug("onUiEvent USER_SPEECH_TEXT notice:", err);
+              }
+            }
+          } else if (payload.type === "ASSISTANT_RESPONSE" && (payload.turn_text || payload.message)) {
+            const cleanText = (payload.turn_text || payload.message || "").trim();
+            if (!cleanText) return;
+
             const detectedLang = payload.language || activeLanguageRef.current;
             if (payload.language) {
               setActiveLanguage(payload.language);
             }
             setMessages((prev) => {
+              const turnId = payload.turn_id;
+              if (turnId) {
+                const existingIdx = prev.findIndex((m) => m.id === turnId);
+                if (existingIdx !== -1) {
+                  const updated = [...prev];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    text: cleanText,
+                    toolCall: payload.tool_call || updated[existingIdx].toolCall,
+                    language: detectedLang
+                  };
+                  return updated;
+                }
+                return [
+                  ...prev,
+                  {
+                    id: turnId,
+                    speaker: "mia",
+                    text: cleanText,
+                    timestamp: new Date().toLocaleTimeString(),
+                    toolCall: payload.tool_call,
+                    language: detectedLang
+                  }
+                ];
+              }
+
               if (prev.length > 0) {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg.speaker === "mia") {
                   let newText = "";
-                  if (payload.message.startsWith(lastMsg.text)) {
-                    newText = payload.message;
-                  } else if (lastMsg.text.startsWith(payload.message)) {
+                  if (cleanText.startsWith(lastMsg.text)) {
+                    newText = cleanText;
+                  } else if (lastMsg.text.startsWith(cleanText)) {
                     newText = lastMsg.text;
-                  } else if (payload.is_delta || payload.message.length < 40) {
-                    const sep = (lastMsg.text.endsWith(" ") || payload.message.startsWith(" ")) ? "" : " ";
-                    newText = lastMsg.text + sep + payload.message;
+                  } else if (payload.is_delta || cleanText.length < 40) {
+                    newText = `${lastMsg.text} ${cleanText}`.trim();
                   } else {
-                    newText = payload.message;
+                    newText = cleanText;
                   }
 
                   const updated = [...prev];
                   updated[updated.length - 1] = {
                     ...lastMsg,
-                    text: newText.trim(),
+                    text: newText,
                     toolCall: payload.tool_call || lastMsg.toolCall,
                     language: detectedLang
                   };
@@ -222,7 +307,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
                 {
                   id: (Date.now() + Math.random()).toString(),
                   speaker: "mia",
-                  text: payload.message.trim(),
+                  text: cleanText,
                   timestamp: new Date().toLocaleTimeString(),
                   toolCall: payload.tool_call,
                   language: detectedLang
@@ -235,7 +320,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
               window.speechSynthesis.cancel();
             }
 
-            const words = (payload.message || "").split(/\s+/).length;
+            const words = cleanText.split(/\s+/).length;
             const durationMs = Math.min(8000, Math.max(2500, words * 170));
             const startT = performance.now();
             const animLip = () => {
@@ -249,8 +334,15 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
             };
             animLip();
           } else if (payload.type === "UI_ACTION") {
+            if (payload.tool_name === "end_call") {
+              scheduleAutoEndCall();
+            }
             if (onUiEventRef.current) {
-              onUiEventRef.current(payload);
+              try {
+                onUiEventRef.current(payload);
+              } catch (err) {
+                console.debug("onUiEvent UI_ACTION notice:", err);
+              }
             }
           } else if (payload.type === "AUDIO_ENERGY") {
             setRmsLevel(payload.rms * 2.5);
@@ -585,7 +677,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     hasGreetedRef.current = false;
 
     // Flush and persist the entire conversation session transcript to SQLite database
-    const currentMsgs = [...messages];
+    const currentMsgs = [...messagesRef.current];
     if (currentMsgs.length > 0) {
       saveFullSessionTranscript({
         session_id: sessionIdRef.current,
@@ -608,6 +700,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       }
     ]);
   };
+  stopVoiceRecordingRef.current = stopVoiceRecording;
 
   const switchLanguage = (lang: string) => {
     setActiveLanguage(lang);

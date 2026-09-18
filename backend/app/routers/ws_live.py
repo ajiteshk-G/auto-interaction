@@ -256,7 +256,7 @@ Guidelines:
 
                 active_system_prompt = brand_outbound_prompt if is_outbound else build_brand_system_prompt(active_b.id if active_b else None)
 
-                active_voice = "Aoede" if is_outbound else (avatar_voice or "Puck")
+                active_voice = "Aoede" if is_outbound else (avatar_voice if avatar_voice and avatar_voice not in ("Puck", "Charon", "Fenrir", "Orus") else "Aoede")
                 active_modality = "AUDIO"
 
                 # Talk to AI Specialist uses Gemini 2.5 Native Live Audio; Outbound call uses Gemini Live Audio
@@ -277,6 +277,16 @@ Guidelines:
                                     },
                                     "required": ["variant"]
                                 }
+                            },
+                            {
+                                "name": "end_call",
+                                "description": "Call this tool immediately after speaking your polite farewell whenever the customer indicates they have finished the conversation (e.g. says 'no thank you', 'nahi chahiye thank you', 'bye', 'bas dhanyavaad').",
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {
+                                        "reason": {"type": "string"}
+                                    }
+                                }
                             }
                         ]
                     }
@@ -285,7 +295,7 @@ Guidelines:
                         "functionDeclarations": [
                             {
                                 "name": "switch_vehicle_showroom",
-                                "description": f"MANDATORY: Call this tool immediately whenever the customer asks about, compares, inquires about, or mentions any vehicle in our lineup ({cars_summary}). This switches the showroom backdrop, hero stage, and focuses the vehicle carousel directly on that car.",
+                                "description": f"Call this tool whenever the customer asks about, compares, inquires about, or mentions any vehicle in our lineup ({cars_summary}). This switches the showroom backdrop, hero stage, and focuses the vehicle carousel directly on that car.",
                                 "parameters": {
                                     "type": "object",
                                     "properties": {
@@ -352,6 +362,19 @@ Guidelines:
                                         }
                                     },
                                     "required": ["model_name"]
+                                }
+                            },
+                            {
+                                "name": "end_call",
+                                "description": "Call this tool immediately after speaking your polite farewell whenever the customer indicates they have finished the conversation (e.g. says 'no thank you', 'nahi chahiye thank you', 'bye', 'that is all', 'bas dhanyavaad', or asks to end/disconnect the call).",
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {
+                                        "reason": {
+                                            "type": "string",
+                                            "description": "Reason for ending the consultation, e.g. customer_satisfied or user_said_goodbye"
+                                        }
+                                    }
                                 }
                             }
                         ]
@@ -531,16 +554,59 @@ Guidelines:
                     handled_call_ids = set()
                     input_transcript_chunks: list[str] = []
                     output_transcript_chunks: list[str] = []
+                    user_turn_seq = 1
+                    assistant_turn_seq = 1
+                    last_user_turn_text = ""
+                    should_end_call = False
+
+                    FAREWELL_PATTERNS = (
+                        "phir milte hain",
+                        "phir milenge",
+                        "aane ke liye dhanyavaad",
+                        "dhanyavaad! phir",
+                        "have a great day",
+                        "have a wonderful day",
+                        "goodbye",
+                        "alvida",
+                        "bye-bye",
+                        "wish you a great"
+                    )
+                    USER_DONE_PATTERNS = (
+                        "nahi chahiye",
+                        "नहीं चाहिए",
+                        "thank you",
+                        "थैंक यू",
+                        "thanks",
+                        "बस",
+                        "bye",
+                        "कोई प्रश्न नहीं",
+                        "nothing else",
+                        "no thank",
+                        "that's all",
+                        "done"
+                    )
 
                     async def _persist_turn_transcripts(flush_input: bool = True, flush_output: bool = True):
+                        nonlocal user_turn_seq, assistant_turn_seq, last_user_turn_text, should_end_call
                         in_text = ""
                         out_text = ""
                         if flush_input and input_transcript_chunks:
                             in_text = "".join(input_transcript_chunks).strip()
                             input_transcript_chunks.clear()
+                            if in_text:
+                                last_user_turn_text = in_text
+                                user_turn_seq += 1
                         if flush_output and output_transcript_chunks:
                             out_text = "".join(output_transcript_chunks).strip()
                             output_transcript_chunks.clear()
+                            if out_text:
+                                assistant_turn_seq += 1
+                                low_out = out_text.lower()
+                                low_in = last_user_turn_text.lower()
+                                if any(fp in low_out for fp in FAREWELL_PATTERNS) and (
+                                    any(up in low_in for up in USER_DONE_PATTERNS) or "aane ke liye dhanyavaad" in low_out or "phir milte hain" in low_out
+                                ):
+                                    should_end_call = True
                         if not in_text and not out_text:
                             return
                         try:
@@ -590,10 +656,10 @@ Guidelines:
                                 print(f"[{session_id}] Bidi sent keys: {list(bidi_data.keys())}, parts: {len(parts)}", flush=True)
                                 # Check for barge-in interruption per gemini-live-api-dev skill
                                 if server_content.get("interrupted") is True:
-                                    asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=True))
+                                    await _persist_turn_transcripts(flush_input=True, flush_output=True)
                                     await websocket.send_text(json.dumps({"type": "INTERRUPTED"}))
 
-                                # 1. Check for Gemini Live Tool Calls (e.g. switch_vehicle_showroom)
+                                # 1. Check for Gemini Live Tool Calls (e.g. switch_vehicle_showroom, end_call)
                                 tool_call_obj = bidi_data.get("toolCall") or server_content.get("toolCall")
                                 if tool_call_obj:
                                     function_calls = tool_call_obj.get("functionCalls", [])
@@ -606,7 +672,15 @@ Guidelines:
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Tool Call: {fc_name} {fc_args}")
 
-                                        # Respond back to Gemini Live silently so it does not speak a duplicate turn
+                                        if fc_name == "end_call":
+                                            should_end_call = True
+
+                                        tool_note = (
+                                            "Call disconnect scheduled. Speak a brief 1-sentence warm farewell if you have not already done so."
+                                            if fc_name == "end_call"
+                                            else "Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya using strictly feminine grammar ('sakti hoon'/'chahti hoon'), without calling any more tools in this turn."
+                                        )
+
                                         tool_resp = {
                                             "toolResponse": {
                                                 "functionResponses": [
@@ -615,7 +689,7 @@ Guidelines:
                                                             "output": {
                                                                 "status": "success",
                                                                 "executed": fc_name,
-                                                                "note": "UI updated silently. Do NOT repeat your greeting or previous statement; wait for the customer to speak next."
+                                                                "note": tool_note
                                                             }
                                                         },
                                                         "id": call_id
@@ -633,31 +707,39 @@ Guidelines:
                                         }))
 
                                 # 2. Process Live Speech-to-Text & Spoken Assistant Transcriptions
-                                out_trans = server_content.get("outputAudioTranscription") or server_content.get("outputTranscription")
-                                if out_trans and out_trans.get("text"):
-                                    if input_transcript_chunks:
-                                        asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=False))
-                                    output_transcript_chunks.append(out_trans["text"])
-                                    await websocket.send_text(json.dumps({
-                                        "type": "ASSISTANT_RESPONSE",
-                                        "speaker": "mia",
-                                        "message": out_trans["text"],
-                                        "is_delta": True,
-                                        "language": session_mgr.language
-                                    }))
-
                                 in_trans = server_content.get("inputAudioTranscription") or server_content.get("inputTranscription")
                                 if in_trans and in_trans.get("text"):
                                     if output_transcript_chunks:
-                                        asyncio.create_task(_persist_turn_transcripts(flush_input=False, flush_output=True))
+                                        await _persist_turn_transcripts(flush_input=False, flush_output=True)
                                     speech_txt = in_trans["text"]
                                     input_transcript_chunks.append(speech_txt)
-                                    await websocket.send_text(json.dumps({
-                                        "type": "USER_TRANSCRIPTION",
-                                        "speaker": "customer",
-                                        "message": speech_txt,
-                                        "is_delta": True
-                                    }))
+                                    accumulated_user_text = "".join(input_transcript_chunks).strip()
+                                    if accumulated_user_text:
+                                        await websocket.send_text(json.dumps({
+                                            "type": "USER_TRANSCRIPTION",
+                                            "speaker": "customer",
+                                            "turn_id": f"{session_id}-user-{user_turn_seq}",
+                                            "turn_text": accumulated_user_text,
+                                            "message": speech_txt,
+                                            "is_delta": True
+                                        }))
+
+                                out_trans = server_content.get("outputAudioTranscription") or server_content.get("outputTranscription")
+                                if out_trans and out_trans.get("text"):
+                                    if input_transcript_chunks:
+                                        await _persist_turn_transcripts(flush_input=True, flush_output=False)
+                                    output_transcript_chunks.append(out_trans["text"])
+                                    accumulated_mia_text = "".join(output_transcript_chunks).strip()
+                                    if accumulated_mia_text:
+                                        await websocket.send_text(json.dumps({
+                                            "type": "ASSISTANT_RESPONSE",
+                                            "speaker": "mia",
+                                            "turn_id": f"{session_id}-mia-{assistant_turn_seq}",
+                                            "turn_text": accumulated_mia_text,
+                                            "message": out_trans["text"],
+                                            "is_delta": True,
+                                            "language": session_mgr.language
+                                        }))
 
                                 # 3. Process Video, Audio, FunctionCall, and Text parts
                                 for part in parts:
@@ -672,6 +754,15 @@ Guidelines:
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Part FunctionCall: {fc_name} {fc_args}")
 
+                                        if fc_name == "end_call":
+                                            should_end_call = True
+
+                                        tool_note = (
+                                            "Call disconnect scheduled. Speak a brief 1-sentence warm farewell if you have not already done so."
+                                            if fc_name == "end_call"
+                                            else "Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya using strictly feminine grammar ('sakti hoon'/'chahti hoon'), without calling any more tools in this turn."
+                                        )
+
                                         # Respond back immediately so Gemini Live audio generation proceeds
                                         tool_resp = {
                                             "toolResponse": {
@@ -682,7 +773,7 @@ Guidelines:
                                                                 "status": "success",
                                                                 "executed": fc_name,
                                                                 "info": f"Switched showroom to {fc_args.get('car_name', 'selected model')}",
-                                                                "note": "UI updated silently. Do NOT repeat your greeting or previous statement; wait for the customer to speak next."
+                                                                "note": tool_note
                                                             }
                                                         },
                                                         "id": call_id
@@ -709,17 +800,28 @@ Guidelines:
                                                 "audio_b64": data_b64,
                                                 "mime_type": mime_type or "audio/pcm;rate=24000"
                                             }))
-                                    if "text" in part and not (out_trans and out_trans.get("text")):
+                                    if "text" in part and not part.get("thought") and not (out_trans and out_trans.get("text")):
                                         output_transcript_chunks.append(part["text"])
-                                        await websocket.send_text(json.dumps({
-                                            "type": "ASSISTANT_RESPONSE",
-                                            "speaker": "mia",
-                                            "message": part["text"],
-                                            "language": session_mgr.language
-                                        }))
+                                        accumulated_mia_text = "".join(output_transcript_chunks).strip()
+                                        if accumulated_mia_text:
+                                            await websocket.send_text(json.dumps({
+                                                "type": "ASSISTANT_RESPONSE",
+                                                "speaker": "mia",
+                                                "turn_id": f"{session_id}-mia-{assistant_turn_seq}",
+                                                "turn_text": accumulated_mia_text,
+                                                "message": part["text"],
+                                                "language": session_mgr.language
+                                            }))
 
                                 if server_content.get("turnComplete") is True:
-                                    asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=True))
+                                    await _persist_turn_transcripts(flush_input=True, flush_output=True)
+                                    await websocket.send_text(json.dumps({"type": "TURN_COMPLETE"}))
+                                    if should_end_call:
+                                        await websocket.send_text(json.dumps({
+                                            "type": "CALL_ENDED",
+                                            "reason": "conversation_complete"
+                                        }))
+                                        should_end_call = False
                             except Exception as e:
                                 logger.debug(f"Error parsing bidi message: {e}")
                     except Exception as e:

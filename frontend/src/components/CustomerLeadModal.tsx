@@ -257,16 +257,28 @@ export function CustomerLeadModal({
 
           {/* Quick Demo Pre-fill */}
           <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-            <span>Demo Shortcut:</span>
+            <span>Demo Profile Autofill:</span>
             <button
               type="button"
               onClick={() => {
-                setName("Kunal Mathuria");
-                setPhone("9820155432");
+                const firstNames = [
+                  "Aarav", "Rohan", "Vikram", "Aditya", "Siddharth", "Ananya",
+                  "Priya", "Meera", "Neha", "Karan", "Arjun", "Divya",
+                  "Rahul", "Ishaan", "Nikhil", "Pooja", "Sneha", "Karthik"
+                ];
+                const lastNames = [
+                  "Sharma", "Verma", "Patel", "Iyer", "Nair", "Reddy",
+                  "Kulkarni", "Mehta", "Malhotra", "Joshi", "Gupta", "Rao"
+                ];
+                const prefixes = ["98", "99", "97", "96", "95", "91", "88", "89"];
+                const rndName = `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+                const rndPhone = `${prefixes[Math.floor(Math.random() * prefixes.length)]}${Math.floor(10000000 + Math.random() * 90000000)}`;
+                setName(rndName);
+                setPhone(rndPhone);
               }}
-              className="text-red-600 hover:underline font-bold"
+              className="text-red-600 hover:underline font-bold cursor-pointer"
             >
-              ⚡ Fill Kunal Mathuria (9820155432)
+              ⚡ Auto Fill Random Indian Profile {name && phone ? `(${name} • ${phone})` : ""}
             </button>
           </div>
 

@@ -41,6 +41,31 @@ interface ChatAvatarPanelProps {
   brand?: BrandCatalog | null;
 }
 
+const INDIAN_FIRST_NAMES = [
+  "Aarav", "Rohan", "Vikram", "Aditya", "Siddharth", "Ananya",
+  "Priya", "Meera", "Neha", "Karan", "Arjun", "Divya",
+  "Rahul", "Ishaan", "Nikhil", "Pooja", "Sneha", "Karthik",
+  "Shreya", "Varun", "Abhishek", "Tanvi", "Harsh", "Riya"
+];
+
+const INDIAN_LAST_NAMES = [
+  "Sharma", "Verma", "Patel", "Iyer", "Nair", "Reddy",
+  "Kulkarni", "Mehta", "Malhotra", "Joshi", "Gupta", "Rao",
+  "Chatterjee", "Kapoor", "Deshmukh", "Khanna", "Agarwal", "Bansal"
+];
+
+function generateRandomIndianProfile(): { name: string; phone: string } {
+  const first = INDIAN_FIRST_NAMES[Math.floor(Math.random() * INDIAN_FIRST_NAMES.length)];
+  const last = INDIAN_LAST_NAMES[Math.floor(Math.random() * INDIAN_LAST_NAMES.length)];
+  const prefixes = ["98", "99", "97", "96", "95", "91", "88", "89", "79"];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const rest = Math.floor(10000000 + Math.random() * 90000000).toString();
+  return {
+    name: `${first} ${last}`,
+    phone: `${prefix}${rest}`
+  };
+}
+
 export function ChatAvatarPanel({
   isRecording,
   rmsLevel,
@@ -58,6 +83,10 @@ export function ChatAvatarPanel({
 }: ChatAvatarPanelProps) {
   const [name, setName] = useState<string>(initialCustomerName || "");
   const [phone, setPhone] = useState<string>(initialCustomerPhone || "");
+  const [demoProfile, setDemoProfile] = useState<{ name: string; phone: string }>({
+    name: "Aarav Sharma",
+    phone: "9820418293"
+  });
   const [nameError, setNameError] = useState<string>("");
   const [phoneError, setPhoneError] = useState<string>("");
   const [touched, setTouched] = useState<{ name: boolean; phone: boolean }>({ name: false, phone: false });
@@ -70,6 +99,10 @@ export function ChatAvatarPanel({
   const brandName = brand?.name ? brand.name.replace(/\(.*\)/, "").trim() : "Mahindra";
   const primaryColor = brand?.primary_color || "#d71920";
   const agentName = brand?.agent_name || brand?.avatar_name || "Kavya";
+
+  useEffect(() => {
+    setDemoProfile(generateRandomIndianProfile());
+  }, []);
 
   useEffect(() => {
     if (initialCustomerName && initialCustomerPhone) {
@@ -399,20 +432,22 @@ export function ChatAvatarPanel({
 
           <form onSubmit={handleStartConsultation} className="space-y-3.5 max-w-[340px] mx-auto w-full">
             <div className="flex items-center justify-between bg-white/[0.04] border border-white/10 rounded-xl p-2.5">
-              <div className="text-[10px] text-slate-300">
-                <span className="font-bold text-white">Demo Profile</span>: Ajitesh Kumar
+              <div className="text-[10px] text-slate-300 truncate pr-2">
+                <span className="font-bold text-white">Demo Profile</span>: {name || demoProfile.name} ({phone || demoProfile.phone})
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setName("Ajitesh Kumar");
-                  setPhone("9154920275");
+                  const nextProfile = generateRandomIndianProfile();
+                  setDemoProfile(nextProfile);
+                  setName(nextProfile.name);
+                  setPhone(nextProfile.phone);
                   setNameError("");
                   setPhoneError("");
                   setTouched({ name: true, phone: true });
                 }}
-                className="text-[10px] font-bold text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/40 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
-                title="Fill dummy details: Ajitesh Kumar (+91 91549 20275)"
+                className="text-[10px] font-bold text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/40 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 shrink-0"
+                title="Generate and fill random Indian customer name & mobile number"
               >
                 <Sparkles className="w-2.5 h-2.5 text-amber-300" />
                 <span>Auto Fill</span>
@@ -443,7 +478,7 @@ export function ChatAvatarPanel({
                   setTouched((prev) => ({ ...prev, name: true }));
                   setNameError(validateName(name));
                 }}
-                placeholder="e.g. Ajitesh Kumar"
+                placeholder="e.g. Aarav Sharma"
                 className={`w-full bg-[#151D2C] border rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
                   touched.name && nameError
                     ? "border-red-500 ring-1 ring-red-500/40 bg-red-950/20"
@@ -546,17 +581,17 @@ export function ChatAvatarPanel({
                   id="active-indian-lang-select"
                   className="lang-select-dropdown bg-[#161F30] border border-white/10 text-white text-[10px] rounded-lg px-2 py-1 focus:outline-none"
                   value={
-                    activeLanguage === "Hinglish" || activeLanguage === "Hindi"
-                      ? "hi-IN"
-                      : activeLanguage === "English"
+                    activeLanguage === "English" || activeLanguage === "en-IN" || !activeLanguage
                       ? "en-IN"
+                      : activeLanguage === "Hinglish" || activeLanguage === "Hindi"
+                      ? "hi-IN"
                       : activeLanguage
                   }
                   onChange={handleLanguageChange}
                   title="Select Indian Language for Voice & Consultation"
                 >
+                  <option value="en-IN">🇮🇳 English (en-IN)</option>
                   <option value="hi-IN">🇮🇳 Hindi (हिन्दी)</option>
-                  <option value="en-IN">🇬🇧 English / Hinglish</option>
                   <option value="ta-IN">🇮🇳 Tamil (தமிழ்)</option>
                   <option value="te-IN">🇮🇳 Telugu (తెలుగు)</option>
                   <option value="kn-IN">🇮🇳 Kannada (ಕನ್ನಡ)</option>
@@ -653,12 +688,15 @@ export function ChatAvatarPanel({
               {showCalendar && (
                 <TestDriveChatCalendar
                   vehicleId={activeVehicleId}
-                  customerName={name || initialCustomerName || "Ajitesh Kumar"}
-                  customerPhone={phone || initialCustomerPhone || "9154920275"}
+                  customerName={name || initialCustomerName || "Valued Customer"}
+                  customerPhone={phone || initialCustomerPhone || ""}
                   onSlotBooked={(booking) => {
                     onSendMessage(
                       `I have successfully booked the ${booking.vehicle_name} (${booking.variant || ""}) test drive for ${booking.slot_date} at ${booking.slot_time}. Reference: ${booking.booking_reference}.`
                     );
+                    setTimeout(() => {
+                      setShowCalendar(false);
+                    }, 1800);
                   }}
                   onClose={() => setShowCalendar(false)}
                 />

@@ -139,14 +139,31 @@ async def post_live_chat(req: LiveChatRequest, db: AsyncSession = Depends(get_db
 _CACHED_TOKEN: Optional[str] = None
 _TOKEN_EXPIRY: float = 0.0
 
-async def get_bearer_token():
+async def get_bearer_token(force_refresh: bool = False):
     global _CACHED_TOKEN, _TOKEN_EXPIRY
     import time
+    import os
+    import subprocess
     now = time.time()
-    if _CACHED_TOKEN and now < _TOKEN_EXPIRY:
+    if not force_refresh and _CACHED_TOKEN and now < _TOKEN_EXPIRY:
         return _CACHED_TOKEN, settings.VERTEX_PROJECT_ID
 
     def _fetch_token():
+        # 1. Local development / Cloudtop: when K_SERVICE is not set, prefer active gcloud account token
+        # (e.g. admin@ajiteshk.altostrat.com which has Vertex AI permissions on mb-poc-352009)
+        if not os.environ.get("K_SERVICE"):
+            try:
+                gcloud_token = subprocess.check_output(
+                    ["gcloud", "auth", "print-access-token"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=5
+                ).decode("utf-8").strip()
+                if gcloud_token:
+                    return gcloud_token, settings.VERTEX_PROJECT_ID or "mb-poc-352009"
+            except Exception as gcloud_err:
+                logger.debug(f"gcloud token fetch fallback notice: {gcloud_err}")
+
+        # 2. Cloud Run Service Account / Application Default Credentials
         try:
             creds, project_id = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
             auth_req = google.auth.transport.requests.Request()
@@ -390,7 +407,7 @@ Guidelines:
                             },
                             {
                                 "name": "end_call",
-                                "description": "Call this tool immediately after speaking your polite farewell whenever the customer indicates they have finished the conversation (e.g. says 'no thank you', 'nahi chahiye thank you', 'bye', 'that is all', 'bas dhanyavaad', or asks to end/disconnect the call).",
+                                "description": "Call this tool immediately after speaking your polite farewell ONLY when the customer explicitly indicates they have finished the entire conversation (e.g. says 'no thank you', 'nahi chahiye thank you', 'bye', 'that is all', 'bas dhanyavaad', or asks to end/disconnect the call). NEVER call this tool when a test drive or test ride is booked — after booking a test drive, you MUST continue the conversation and ask if they have any other questions about features, variants, or financing.",
                                 "parameters": {
                                     "type": "object",
                                     "properties": {
@@ -410,6 +427,7 @@ Guidelines:
                     "generationConfig": {
                         "responseModalities": [active_modality],
                         "speechConfig": {
+                            "languageCode": "en-IN",
                             "voiceConfig": {
                                 "prebuiltVoiceConfig": {
                                     "voiceName": active_voice
@@ -451,11 +469,21 @@ Guidelines:
                             }
                         }
                         await bidi_ws.send(json.dumps(init_greeting_prompt))
+                except websockets.exceptions.ConnectionClosed as closed_err:
+                    global _CACHED_TOKEN, _TOKEN_EXPIRY
+                    _CACHED_TOKEN = None
+                    _TOKEN_EXPIRY = 0.0
+                    logger.error(f"Vertex Bidi closed during setup: {closed_err}")
+                    raise closed_err
                 except Exception as e:
                     logger.debug(f"Vertex setup response notice: {e}")
 
+                last_user_turn_text = ""
+                suppress_end_call_for_turn = False
+
                 # Task: Client -> Vertex Bidi
                 async def client_to_bidi():
+                    nonlocal last_user_turn_text, suppress_end_call_for_turn
                     try:
                         print(f"[{session_id}] client_to_bidi task started", flush=True)
                         while True:
@@ -501,7 +529,7 @@ Guidelines:
                                                 "turns": [
                                                     {
                                                         "role": "user",
-                                                        "parts": [{"text": f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as {avatar_name}, introducing yourself as {brand_name}'s female AI Showroom Specialist, welcoming them to the virtual showroom in {session_mgr.language}, and asking which vehicle or model they would like to explore today. Do NOT call any tools or functions during this initial greeting."}]
+                                                        "parts": [{"text": f"Please give a warm, concise spoken greeting 100% in English ('Hello {cust_name}! Welcome to the {brand_name} Virtual Showroom. I am {avatar_name}, your AI Showroom Specialist. Which vehicle would you like to explore today?'). Do NOT use any Hindi words in this initial greeting, and on every subsequent turn dynamically match whatever language the customer speaks. Do NOT call any tools during this greeting."}]
                                                     }
                                                 ],
                                                 "turnComplete": True
@@ -513,6 +541,18 @@ Guidelines:
                                         user_text = payload.get("text", "")
                                         if not user_text:
                                             continue
+                                        last_user_turn_text = user_text
+                                        from app.services.gemini_live_session import detect_indian_language
+                                        session_mgr.language = detect_indian_language(user_text)
+                                        low_user_text = user_text.lower()
+                                        is_booking_msg = (
+                                            "successfully booked" in low_user_text
+                                            or "reference:" in low_user_text
+                                            or ("test drive" in low_user_text and "book" in low_user_text)
+                                        )
+                                        if is_booking_msg:
+                                            suppress_end_call_for_turn = True
+
                                         # Log customer text interaction in background
                                         async def _log_user_chat(txt: str):
                                             try:
@@ -529,12 +569,17 @@ Guidelines:
                                                 logger.debug(f"User chat log notice: {err}")
                                         asyncio.create_task(_log_user_chat(user_text))
 
+                                        prompt_for_model = (
+                                            f"{user_text}\n[System Instruction: Confirm this test drive booking warmly in 1-2 sentences in {session_mgr.language}, and then ask the customer what else they would like to explore next—such as vehicle features, variant comparison, or EMI/financing options. Do NOT end the call and do NOT call end_call.]"
+                                            if is_booking_msg
+                                            else f"{user_text}\n[System Instruction: Respond 100% in {session_mgr.language} (the exact language the customer just used).]"
+                                        )
                                         chat_turn = {
                                             "clientContent": {
                                                 "turns": [
                                                     {
                                                         "role": "user",
-                                                        "parts": [{"text": user_text}]
+                                                        "parts": [{"text": prompt_for_model}]
                                                     }
                                                 ],
                                                 "turnComplete": True
@@ -542,14 +587,14 @@ Guidelines:
                                         }
                                         await bidi_ws.send(json.dumps(chat_turn))
                                     elif msg_type == "SWITCH_LANGUAGE":
-                                        new_lang = payload.get("language", "Hinglish")
+                                        new_lang = payload.get("language", "English")
                                         session_mgr.language = new_lang
                                         lang_turn = {
                                             "clientContent": {
                                                 "turns": [
                                                     {
                                                         "role": "user",
-                                                        "parts": [{"text": f"From now on, please speak and respond fluently in {new_lang}."}]
+                                                        "parts": [{"text": f"From now on, please speak and respond fluently in {new_lang} unless the customer speaks a different language."}]
                                                     }
                                                 ],
                                                 "turnComplete": True
@@ -575,12 +620,13 @@ Guidelines:
 
                 # Task: Vertex Bidi -> Client
                 async def bidi_to_client():
+                    nonlocal last_user_turn_text, suppress_end_call_for_turn
                     handled_call_ids = set()
                     input_transcript_chunks: list[str] = []
                     output_transcript_chunks: list[str] = []
                     user_turn_seq = 1
                     assistant_turn_seq = 1
-                    last_user_turn_text = ""
+                    last_assistant_turn_text = ""
                     should_end_call = False
 
                     FAREWELL_PATTERNS = (
@@ -588,30 +634,93 @@ Guidelines:
                         "phir milenge",
                         "aane ke liye dhanyavaad",
                         "dhanyavaad! phir",
+                        "aapka din shubh",
+                        "shubh din",
+                        "फिर मिलते हैं",
+                        "फिर मिलेंगे",
+                        "आपका दिन शुभ",
+                        "दिन शुभ हो",
+                        "आने के लिए धन्यवाद",
+                        "धन्यवाद",
+                        "नमस्ते",
+                        "अलविदा",
+                        "have a nice day",
                         "have a great day",
+                        "have a good day",
                         "have a wonderful day",
                         "goodbye",
                         "alvida",
                         "bye-bye",
-                        "wish you a great"
+                        "bye",
+                        "take care",
+                        "wish you a great",
+                        "thank you for visiting",
+                        "thank you for calling"
+                    )
+                    STRONG_FAREWELL_PATTERNS = (
+                        "have a nice day",
+                        "have a great day",
+                        "have a good day",
+                        "have a wonderful day",
+                        "आपका दिन शुभ हो",
+                        "आपका दिन शुभ रहे",
+                        "फिर मिलते हैं",
+                        "फिर मिलेंगे",
+                        "आने के लिए धन्यवाद",
+                        "aapka din shubh ho",
+                        "phir milte hain",
+                        "phir milenge",
+                        "aane ke liye dhanyavaad",
+                        "goodbye",
+                        "bye-bye",
+                        "अलविदा",
+                        "alvida"
                     )
                     USER_DONE_PATTERNS = (
                         "nahi chahiye",
                         "नहीं चाहिए",
+                        "no, thank",
+                        "no thank",
+                        "no, thanks",
+                        "no thanks",
                         "thank you",
                         "थैंक यू",
+                        "धन्यवाद",
                         "thanks",
                         "बस",
                         "bye",
+                        "goodbye",
                         "कोई प्रश्न नहीं",
                         "nothing else",
-                        "no thank",
                         "that's all",
-                        "done"
+                        "that is all",
+                        "all good",
+                        "done",
+                        "end the call",
+                        "disconnect"
+                    )
+                    UNAMBIGUOUS_USER_DONE_PATTERNS = (
+                        "no, thank",
+                        "no thank",
+                        "no, thanks",
+                        "no thanks",
+                        "nahi chahiye",
+                        "नहीं चाहिए",
+                        "कोई प्रश्न नहीं",
+                        "nothing else",
+                        "that's all",
+                        "that is all",
+                        "bye",
+                        "goodbye",
+                        "अलविदा",
+                        "बस धन्यवाद",
+                        "bas dhanyavaad",
+                        "end the call",
+                        "disconnect"
                     )
 
                     async def _persist_turn_transcripts(flush_input: bool = True, flush_output: bool = True):
-                        nonlocal user_turn_seq, assistant_turn_seq, last_user_turn_text, should_end_call
+                        nonlocal user_turn_seq, assistant_turn_seq, last_user_turn_text, last_assistant_turn_text, should_end_call, suppress_end_call_for_turn
                         in_text = ""
                         out_text = ""
                         if flush_input and input_transcript_chunks:
@@ -619,18 +728,31 @@ Guidelines:
                             input_transcript_chunks.clear()
                             if in_text:
                                 last_user_turn_text = in_text
+                                from app.services.gemini_live_session import detect_indian_language
+                                session_mgr.language = detect_indian_language(in_text)
                                 user_turn_seq += 1
                         if flush_output and output_transcript_chunks:
                             out_text = "".join(output_transcript_chunks).strip()
                             output_transcript_chunks.clear()
                             if out_text:
+                                last_assistant_turn_text = out_text
                                 assistant_turn_seq += 1
                                 low_out = out_text.lower()
                                 low_in = last_user_turn_text.lower()
-                                if any(fp in low_out for fp in FAREWELL_PATTERNS) and (
-                                    any(up in low_in for up in USER_DONE_PATTERNS) or "aane ke liye dhanyavaad" in low_out or "phir milte hain" in low_out
-                                ):
-                                    should_end_call = True
+                                is_booking_turn = (
+                                    suppress_end_call_for_turn
+                                    or "successfully booked" in low_in
+                                    or "reference:" in low_in
+                                    or ("test drive" in low_in and "book" in low_in)
+                                    or "test drive book ho" in low_out
+                                )
+                                if not is_booking_turn:
+                                    if any(up in low_in for up in UNAMBIGUOUS_USER_DONE_PATTERNS):
+                                        should_end_call = True
+                                    elif any(up in low_in for up in USER_DONE_PATTERNS) and any(fp in low_out for fp in FAREWELL_PATTERNS):
+                                        should_end_call = True
+                                    elif "?" not in out_text and any(sfp in low_out for sfp in STRONG_FAREWELL_PATTERNS):
+                                        should_end_call = True
                         if not in_text and not out_text:
                             return
                         try:
@@ -696,14 +818,34 @@ Guidelines:
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Tool Call: {fc_name} {fc_args}")
 
-                                        if fc_name == "end_call":
+                                        low_in_now = last_user_turn_text.lower()
+                                        is_booking_context = (
+                                            suppress_end_call_for_turn
+                                            or fc_name in ("open_test_drive_booking", "book_test_drive")
+                                            or "successfully booked" in low_in_now
+                                            or "reference:" in low_in_now
+                                            or ("test drive" in low_in_now and "book" in low_in_now)
+                                        )
+                                        if fc_name in ("open_test_drive_booking", "book_test_drive"):
+                                            suppress_end_call_for_turn = True
+                                            should_end_call = False
+
+                                        allow_end_call = (
+                                            fc_name == "end_call"
+                                            and not is_booking_context
+                                            and any(up in low_in_now for up in USER_DONE_PATTERNS)
+                                        )
+                                        if allow_end_call:
                                             should_end_call = True
 
-                                        tool_note = (
-                                            "Call disconnect scheduled. Speak a brief 1-sentence warm farewell if you have not already done so."
-                                            if fc_name == "end_call"
-                                            else "Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya using strictly feminine grammar ('sakti hoon'/'chahti hoon'), without calling any more tools in this turn."
-                                        )
+                                        if fc_name == "end_call" and not allow_end_call:
+                                            tool_note = f"Do NOT end the call yet—the customer booked a test drive or has not finished the consultation. Confirm the details warmly in {session_mgr.language} and ask what else they would like to explore (such as features, variants, or EMI/financing options)."
+                                        elif fc_name == "end_call":
+                                            tool_note = f"Call disconnect scheduled. Speak a brief 1-sentence warm farewell in {session_mgr.language} if you have not already done so."
+                                        elif fc_name in ("open_test_drive_booking", "book_test_drive"):
+                                            tool_note = f"Test drive booking calendar is open/updated on the customer's screen. Warmly guide the customer or confirm their booking in {session_mgr.language}, and continue the conversation by asking if they have any questions about vehicle features, variants, or EMI/financing. Do NOT end the call."
+                                        else:
+                                            tool_note = f"Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya in {session_mgr.language} (matching the exact language the customer just spoke), without calling any more tools in this turn."
 
                                         tool_resp = {
                                             "toolResponse": {
@@ -723,12 +865,13 @@ Guidelines:
                                         }
                                         await bidi_ws.send(json.dumps(tool_resp))
 
-                                        # Emit UI action to client
-                                        await websocket.send_text(json.dumps({
-                                            "type": "UI_ACTION",
-                                            "tool_name": fc_name,
-                                            "tool_args": fc_args
-                                        }))
+                                        # Emit UI action to client (skip end_call if suppressed)
+                                        if fc_name != "end_call" or allow_end_call:
+                                            await websocket.send_text(json.dumps({
+                                                "type": "UI_ACTION",
+                                                "tool_name": fc_name,
+                                                "tool_args": fc_args
+                                            }))
 
                                 # 2. Process Live Speech-to-Text & Spoken Assistant Transcriptions
                                 in_trans = server_content.get("inputAudioTranscription") or server_content.get("inputTranscription")
@@ -739,13 +882,16 @@ Guidelines:
                                     input_transcript_chunks.append(speech_txt)
                                     accumulated_user_text = "".join(input_transcript_chunks).strip()
                                     if accumulated_user_text:
+                                        from app.services.gemini_live_session import detect_indian_language
+                                        session_mgr.language = detect_indian_language(accumulated_user_text)
                                         await websocket.send_text(json.dumps({
                                             "type": "USER_TRANSCRIPTION",
                                             "speaker": "customer",
                                             "turn_id": f"{session_id}-user-{user_turn_seq}",
                                             "turn_text": accumulated_user_text,
                                             "message": speech_txt,
-                                            "is_delta": True
+                                            "is_delta": True,
+                                            "language": session_mgr.language
                                         }))
 
                                 out_trans = server_content.get("outputAudioTranscription") or server_content.get("outputTranscription")
@@ -778,14 +924,34 @@ Guidelines:
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Part FunctionCall: {fc_name} {fc_args}")
 
-                                        if fc_name == "end_call":
+                                        low_in_now = last_user_turn_text.lower()
+                                        is_booking_context = (
+                                            suppress_end_call_for_turn
+                                            or fc_name in ("open_test_drive_booking", "book_test_drive")
+                                            or "successfully booked" in low_in_now
+                                            or "reference:" in low_in_now
+                                            or ("test drive" in low_in_now and "book" in low_in_now)
+                                        )
+                                        if fc_name in ("open_test_drive_booking", "book_test_drive"):
+                                            suppress_end_call_for_turn = True
+                                            should_end_call = False
+
+                                        allow_end_call = (
+                                            fc_name == "end_call"
+                                            and not is_booking_context
+                                            and any(up in low_in_now for up in USER_DONE_PATTERNS)
+                                        )
+                                        if allow_end_call:
                                             should_end_call = True
 
-                                        tool_note = (
-                                            "Call disconnect scheduled. Speak a brief 1-sentence warm farewell if you have not already done so."
-                                            if fc_name == "end_call"
-                                            else "Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya using strictly feminine grammar ('sakti hoon'/'chahti hoon'), without calling any more tools in this turn."
-                                        )
+                                        if fc_name == "end_call" and not allow_end_call:
+                                            tool_note = f"Do NOT end the call yet—the customer booked a test drive or has not finished the consultation. Confirm the details warmly in {session_mgr.language} and ask what else they would like to explore (such as features, variants, or EMI/financing options)."
+                                        elif fc_name == "end_call":
+                                            tool_note = f"Call disconnect scheduled. Speak a brief 1-sentence warm farewell in {session_mgr.language} if you have not already done so."
+                                        elif fc_name in ("open_test_drive_booking", "book_test_drive"):
+                                            tool_note = f"Test drive booking calendar is open/updated on the customer's screen. Warmly guide the customer or confirm their booking in {session_mgr.language}, and continue the conversation by asking if they have any questions about vehicle features, variants, or EMI/financing. Do NOT end the call."
+                                        else:
+                                            tool_note = f"Showroom UI updated to focus on the selected vehicle. Now immediately answer the customer's question warmly and concisely in spoken audio as Kavya in {session_mgr.language} (matching the exact language the customer just spoke), without calling any more tools in this turn."
 
                                         # Respond back immediately so Gemini Live audio generation proceeds
                                         tool_resp = {
@@ -807,11 +973,12 @@ Guidelines:
                                         }
                                         await bidi_ws.send(json.dumps(tool_resp))
 
-                                        await websocket.send_text(json.dumps({
-                                            "type": "UI_ACTION",
-                                            "tool_name": fc_name,
-                                            "tool_args": fc_args
-                                        }))
+                                        if fc_name != "end_call" or allow_end_call:
+                                            await websocket.send_text(json.dumps({
+                                                "type": "UI_ACTION",
+                                                "tool_name": fc_name,
+                                                "tool_args": fc_args
+                                            }))
 
                                     if "inlineData" in part:
                                         mime_type = part["inlineData"].get("mimeType", "")
@@ -840,7 +1007,10 @@ Guidelines:
                                 if server_content.get("turnComplete") is True:
                                     await _persist_turn_transcripts(flush_input=True, flush_output=True)
                                     await websocket.send_text(json.dumps({"type": "TURN_COMPLETE"}))
-                                    if should_end_call:
+                                    if suppress_end_call_for_turn:
+                                        should_end_call = False
+                                        suppress_end_call_for_turn = False
+                                    elif should_end_call:
                                         await websocket.send_text(json.dumps({
                                             "type": "CALL_ENDED",
                                             "reason": "conversation_complete"

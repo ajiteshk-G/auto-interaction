@@ -24,7 +24,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [rmsLevel, setRmsLevel] = useState(0);
   const [messages, setMessages] = useState<LiveMessage[]>([]);
-  const [activeLanguage, setActiveLanguage] = useState("Hinglish");
+  const [activeLanguage, setActiveLanguage] = useState("en-IN");
 
   const socketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -41,6 +41,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const isRecordingRef = useRef(false);
   const messagesRef = useRef<LiveMessage[]>([]);
   const stopVoiceRecordingRef = useRef<() => void>(() => {});
+  const lastTurnWasBookingRef = useRef(false);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
@@ -134,14 +135,14 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const hostname = window.location.hostname;
-    const port = window.location.port;
 
-    // Route to backend port 8000 when frontend runs on port 3000 in dev / cloudtop
-    if (port === "3000" || hostname === "localhost" || hostname === "127.0.0.1") {
+    // Route directly to backend port 8000 only when accessed via localhost / 127.0.0.1;
+    // on Cloudtop proxy domains (*.googlers.com) and Cloud Run, use window.location.host
+    // so Next.js rewrites / Cloud Run route /ws/live-audio on the same port.
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
       return `${protocol}//${hostname}:8000/ws/live-audio${qs}`;
     }
 
-    // On Cloud Run container deployment, connect to the same host
     return `${protocol}//${window.location.host}/ws/live-audio${qs}`;
   };
 
@@ -187,7 +188,11 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
             awaitingGreetingRef.current = false;
           } else if (payload.type === "CALL_ENDED") {
             awaitingGreetingRef.current = false;
-            scheduleAutoEndCall();
+            if (!lastTurnWasBookingRef.current) {
+              scheduleAutoEndCall();
+            } else {
+              lastTurnWasBookingRef.current = false;
+            }
           } else if (payload.type === "INTERRUPTED") {
             awaitingGreetingRef.current = false;
             audioOutputManagerRef.current?.interrupt();
@@ -197,6 +202,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           } else if (payload.type === "USER_TRANSCRIPTION" && (payload.turn_text || payload.message)) {
             const cleanText = (payload.turn_text || payload.message || "").trim();
             if (!cleanText) return;
+            lastTurnWasBookingRef.current = false;
+            if (payload.language) {
+              setActiveLanguage(payload.language);
+            }
 
             setMessages((prev) => {
               const turnId = payload.turn_id;
@@ -336,6 +345,25 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
               window.speechSynthesis.cancel();
             }
 
+            // Client-side safety net: if assistant speaks a clear closing farewell (and not during a test-drive booking or asking a question), auto-end call after playback finishes
+            const lowClean = cleanText.toLowerCase();
+            const isClosingFarewell =
+              !lastTurnWasBookingRef.current &&
+              !cleanText.includes("?") &&
+              (lowClean.includes("have a nice day") ||
+                lowClean.includes("have a great day") ||
+                lowClean.includes("have a wonderful day") ||
+                lowClean.includes("have a good day") ||
+                lowClean.includes("आपका दिन शुभ हो") ||
+                lowClean.includes("फिर मिलते हैं") ||
+                lowClean.includes("आने के लिए धन्यवाद") ||
+                lowClean.includes("phir milte hain") ||
+                lowClean.includes("aapka din shubh ho") ||
+                lowClean.includes("goodbye"));
+            if (isClosingFarewell) {
+              scheduleAutoEndCall();
+            }
+
             const words = cleanText.split(/\s+/).length;
             const durationMs = Math.min(8000, Math.max(2500, words * 170));
             const startT = performance.now();
@@ -350,8 +378,12 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
             };
             animLip();
           } else if (payload.type === "UI_ACTION") {
-            if (payload.tool_name === "end_call") {
-              scheduleAutoEndCall();
+            if (payload.tool_name === "open_test_drive_booking" || payload.tool_name === "book_test_drive") {
+              lastTurnWasBookingRef.current = true;
+            } else if (payload.tool_name === "end_call") {
+              if (!lastTurnWasBookingRef.current) {
+                scheduleAutoEndCall();
+              }
             }
             if (onUiEventRef.current) {
               try {
@@ -400,6 +432,13 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
   const sendTextMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    const low = text.toLowerCase();
+    if (low.includes("successfully booked") || low.includes("reference:") || (low.includes("test drive") && low.includes("book"))) {
+      lastTurnWasBookingRef.current = true;
+    } else {
+      lastTurnWasBookingRef.current = false;
+    }
 
     if (audioOutputManagerRef.current) {
       await audioOutputManagerRef.current.initializeAudioContext();

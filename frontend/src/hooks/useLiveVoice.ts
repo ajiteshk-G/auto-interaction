@@ -145,11 +145,12 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     return `${protocol}//${window.location.host}/ws/live-audio${qs}`;
   };
 
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback((forceReconnect?: boolean) => {
     if (socketRef.current) {
       if (
-        socketRef.current.readyState === WebSocket.CONNECTING ||
-        socketRef.current.readyState === WebSocket.OPEN
+        !forceReconnect &&
+        (socketRef.current.readyState === WebSocket.CONNECTING ||
+          socketRef.current.readyState === WebSocket.OPEN)
       ) {
         return;
       }
@@ -576,15 +577,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     }
 
     // Always open a fresh WebSocket bound to this customer (Name + Phone) and this conversation's session_id
-    if (socketRef.current) {
-      try {
-        socketRef.current.close();
-      } catch (e) {}
-      socketRef.current = null;
-    }
-    connectWebSocket();
+    connectWebSocket(true);
     for (let i = 0; i < 40; i++) {
-      if (socketRef.current && (socketRef.current as WebSocket).readyState === WebSocket.OPEN) {
+      const ws = socketRef.current as WebSocket | null;
+      if (ws && ws.readyState === WebSocket.OPEN) {
         break;
       }
       await new Promise((r) => setTimeout(r, 100));
@@ -673,14 +669,15 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       }
 
       // Trigger dynamic greeting from Kavya on starting live session if no messages yet and not greeted yet
-      if (messages.length === 0 && !hasGreetedRef.current) {
+      if (!hasGreetedRef.current) {
         hasGreetedRef.current = true;
-        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        const activeWs = socketRef.current as WebSocket | null;
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
           awaitingGreetingRef.current = true;
           setTimeout(() => {
             awaitingGreetingRef.current = false;
           }, 3000);
-          socketRef.current.send(
+          activeWs.send(
             JSON.stringify({
               type: "START_SESSION",
               customer_name: customerName || customerInfoRef.current.name || "there",

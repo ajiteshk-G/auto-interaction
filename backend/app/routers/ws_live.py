@@ -439,7 +439,7 @@ Guidelines:
                                                 "turns": [
                                                     {
                                                         "role": "user",
-                                                        "parts": [{"text": f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as {avatar_name}, introducing yourself as {brand_name}'s female AI Showroom Specialist, welcoming them to the virtual showroom in {session_mgr.language}, and asking which vehicle or model they would like to explore today."}]
+                                                        "parts": [{"text": f"Please give a warm, dynamic, non-static spoken greeting to {cust_name} as {avatar_name}, introducing yourself as {brand_name}'s female AI Showroom Specialist, welcoming them to the virtual showroom in {session_mgr.language}, and asking which vehicle or model they would like to explore today. Do NOT call any tools or functions during this initial greeting."}]
                                                     }
                                                 ],
                                                 "turnComplete": True
@@ -449,67 +449,71 @@ Guidelines:
                                         await bidi_ws.send(json.dumps(greeting_turn))
                                     elif msg_type == "USER_CHAT":
                                         user_text = payload.get("text", "")
-                                        if user_text:
-                                            # Send turn to Vertex AI Bidi WebSocket immediately (zero-latency)
-                                            bidi_turn = {
-                                                "clientContent": {
-                                                    "turns": [
-                                                        {
-                                                            "role": "user",
-                                                            "parts": [{"text": user_text}]
-                                                        }
-                                                    ],
-                                                    "turnComplete": True
-                                                }
+                                        if not user_text:
+                                            continue
+                                        # Log customer text interaction in background
+                                        async def _log_user_chat(txt: str):
+                                            try:
+                                                async with AsyncSessionLocal() as db_sess:
+                                                    await CustomerService.log_interaction(
+                                                        db_sess,
+                                                        customer_id_str=customer.customer_id,
+                                                        speaker="customer",
+                                                        message=txt,
+                                                        channel="VOICE_LIVE",
+                                                        session_id_str=session_id
+                                                    )
+                                            except Exception as err:
+                                                logger.debug(f"User chat log notice: {err}")
+                                        asyncio.create_task(_log_user_chat(user_text))
+
+                                        chat_turn = {
+                                            "clientContent": {
+                                                "turns": [
+                                                    {
+                                                        "role": "user",
+                                                        "parts": [{"text": user_text}]
+                                                    }
+                                                ],
+                                                "turnComplete": True
                                             }
-                                            print(f"[{session_id}] Sending USER_CHAT turn to Vertex Bidi", flush=True)
-                                            await bidi_ws.send(json.dumps(bidi_turn))
-
-                                            # Asynchronous background persistence
-                                            async def _async_log_user_turn(txt: str):
-                                                try:
-                                                    async with AsyncSessionLocal() as db_sess:
-                                                        await CustomerService.log_interaction(
-                                                            db_sess,
-                                                            customer_id_str=customer.customer_id,
-                                                            speaker="customer",
-                                                            message=txt,
-                                                            channel="VOICE_LIVE",
-                                                            session_id_str=session_id
-                                                        )
-                                                        from app.services.checklist_service import ChecklistService
-                                                        veh_k = session_mgr.active_vehicle_id or customer.interested_vehicle_id or "thar_roxx"
-                                                        new_chk = ChecklistService.extract_checklist_items(txt, vehicle_id=veh_k)
-                                                        if new_chk:
-                                                            await ChecklistService.update_customer_and_booking_checklist(
-                                                                db_sess,
-                                                                customer_id_str=customer.customer_id,
-                                                                vehicle_id=veh_k,
-                                                                new_items=new_chk
-                                                            )
-                                                except Exception as err:
-                                                    logger.debug(f"User interaction log notice: {err}")
-
-                                            asyncio.create_task(_async_log_user_turn(user_text))
+                                        }
+                                        await bidi_ws.send(json.dumps(chat_turn))
+                                    elif msg_type == "SWITCH_LANGUAGE":
+                                        new_lang = payload.get("language", "Hinglish")
+                                        session_mgr.language = new_lang
+                                        lang_turn = {
+                                            "clientContent": {
+                                                "turns": [
+                                                    {
+                                                        "role": "user",
+                                                        "parts": [{"text": f"From now on, please speak and respond fluently in {new_lang}."}]
+                                                    }
+                                                ],
+                                                "turnComplete": True
+                                            }
+                                        }
+                                        await bidi_ws.send(json.dumps(lang_turn))
                             elif "bytes" in data and data["bytes"]:
-                                import base64
-                                pcm_b64 = base64.b64encode(data["bytes"]).decode("utf-8")
-                                realtime_input = {
+                                pcm_bytes = data["bytes"]
+                                b64_pcm = base64.b64encode(pcm_bytes).decode("utf-8")
+                                audio_input_msg = {
                                     "realtimeInput": {
                                         "mediaChunks": [
                                             {
                                                 "mimeType": "audio/pcm;rate=16000",
-                                                "data": pcm_b64
+                                                "data": b64_pcm
                                             }
                                         ]
                                     }
                                 }
-                                await bidi_ws.send(json.dumps(realtime_input))
+                                await bidi_ws.send(json.dumps(audio_input_msg))
                     except Exception as e:
-                        print(f"[{session_id}] Error in client_to_bidi: {e}", flush=True)
+                        logger.info(f"Client to bidi loop ended: {e}")
 
                 # Task: Vertex Bidi -> Client
                 async def bidi_to_client():
+                    handled_call_ids = set()
                     try:
                         print(f"[{session_id}] bidi_to_client task started", flush=True)
                         while True:
@@ -532,16 +536,25 @@ Guidelines:
                                     function_calls = tool_call_obj.get("functionCalls", [])
                                     for fc in function_calls:
                                         fc_name = fc.get("name")
-                                        call_id = fc.get("id") or "call_0"
+                                        call_id = fc.get("id") or f"{fc_name}_{len(handled_call_ids)}"
+                                        if call_id in handled_call_ids:
+                                            continue
+                                        handled_call_ids.add(call_id)
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Tool Call: {fc_name} {fc_args}")
 
-                                        # Respond back to Gemini Live
+                                        # Respond back to Gemini Live silently so it does not speak a duplicate turn
                                         tool_resp = {
                                             "toolResponse": {
                                                 "functionResponses": [
                                                     {
-                                                        "response": {"output": {"status": "success", "executed": fc_name, "info": f"Switched showroom to {fc_args.get('car_name', 'selected model')}"}},
+                                                        "response": {
+                                                            "output": {
+                                                                "status": "success",
+                                                                "executed": fc_name,
+                                                                "note": "UI updated silently. Do NOT repeat your greeting or previous statement; wait for the customer to speak next."
+                                                            }
+                                                        },
                                                         "id": call_id
                                                     }
                                                 ]
@@ -610,6 +623,9 @@ Guidelines:
                                         fc = part["functionCall"]
                                         fc_name = fc.get("name")
                                         call_id = fc.get("id") or "call_0"
+                                        if call_id in handled_call_ids:
+                                            continue
+                                        handled_call_ids.add(call_id)
                                         fc_args = fc.get("args", {})
                                         logger.info(f"Gemini Live Part FunctionCall: {fc_name} {fc_args}")
 
@@ -618,7 +634,14 @@ Guidelines:
                                             "toolResponse": {
                                                 "functionResponses": [
                                                     {
-                                                        "response": {"output": {"status": "success", "executed": fc_name, "info": f"Switched showroom to {fc_args.get('car_name', 'selected model')}"}},
+                                                        "response": {
+                                                            "output": {
+                                                                "status": "success",
+                                                                "executed": fc_name,
+                                                                "info": f"Switched showroom to {fc_args.get('car_name', 'selected model')}",
+                                                                "note": "UI updated silently. Do NOT repeat your greeting or previous statement; wait for the customer to speak next."
+                                                            }
+                                                        },
                                                         "id": call_id
                                                     }
                                                 ]

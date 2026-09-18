@@ -691,6 +691,8 @@ Guidelines:
                         logger.info(f"Live task completed normally: {t}")
                 for task in pending:
                     task.cancel()
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
                 return
         except Exception as e:
             logger.error(

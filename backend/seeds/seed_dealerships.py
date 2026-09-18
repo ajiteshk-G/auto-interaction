@@ -497,6 +497,7 @@ DEALERSHIPS_DATA = [
 
 async def seed_dealerships():
     async with AsyncSessionLocal() as db:
+        dirty = False
         # 1. Seed Public Holidays
         h_res = await db.execute(select(PublicHoliday))
         existing_holidays = {h.holiday_date: h for h in h_res.scalars().all()}
@@ -509,6 +510,7 @@ async def seed_dealerships():
                     is_active=1
                 )
                 db.add(holiday)
+                dirty = True
 
         # 2. Seed Slot Configs
         s_res = await db.execute(select(SlotConfig))
@@ -521,11 +523,12 @@ async def seed_dealerships():
                     is_active=1
                 )
                 db.add(cfg)
+                dirty = True
 
         # 3. Seed Dealerships
         d_res = await db.execute(select(Dealership))
         existing_dealerships = {d.id: d for d in d_res.scalars().all()}
-        
+
         for item in DEALERSHIPS_DATA:
             if item["id"] not in existing_dealerships:
                 d = Dealership(
@@ -544,22 +547,11 @@ async def seed_dealerships():
                     is_active=True
                 )
                 db.add(d)
-            else:
-                d = existing_dealerships[item["id"]]
-                d.name = item["name"]
-                d.city = item["city"]
-                d.state = item["state"]
-                d.area = item["area"]
-                d.address = item["address"]
-                d.pin_code = item["pin_code"]
-                d.phone = item["phone"]
-                d.email = item["email"]
-                d.map_url = item["map_url"]
-                d.rating = item["rating"]
-                d.available_advisors = item["available_advisors"]
+                dirty = True
 
-        await db.commit()
-        logger.info("Dealership, Holiday and Slot Config Database Seed Complete.")
+        if dirty:
+            await db.commit()
+            logger.info("Dealership, Holiday and Slot Config Database Seed Complete.")
 
 if __name__ == "__main__":
     asyncio.run(seed_dealerships())

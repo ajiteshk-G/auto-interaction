@@ -433,7 +433,21 @@ Guidelines:
                                             }
                                         }))
                                     elif msg_type == "START_SESSION":
+                                        nonlocal customer
                                         cust_name = payload.get("customer_name") or customer.name or "there"
+                                        cust_phone = payload.get("customer_phone")
+                                        if cust_phone or payload.get("customer_name"):
+                                            try:
+                                                async with AsyncSessionLocal() as db_sess:
+                                                    customer = await CustomerService.get_or_create_default_customer(
+                                                        db_sess,
+                                                        phone=cust_phone or customer.phone,
+                                                        name=cust_name,
+                                                        brand_id=active_b.id if active_b else None
+                                                    )
+                                                    session_mgr.customer_id = customer.customer_id
+                                            except Exception as err:
+                                                logger.debug(f"START_SESSION customer lookup notice: {err}")
                                         greeting_turn = {
                                             "clientContent": {
                                                 "turns": [
@@ -514,6 +528,53 @@ Guidelines:
                 # Task: Vertex Bidi -> Client
                 async def bidi_to_client():
                     handled_call_ids = set()
+                    input_transcript_chunks: list[str] = []
+                    output_transcript_chunks: list[str] = []
+
+                    async def _persist_turn_transcripts(flush_input: bool = True, flush_output: bool = True):
+                        in_text = ""
+                        out_text = ""
+                        if flush_input and input_transcript_chunks:
+                            in_text = "".join(input_transcript_chunks).strip()
+                            input_transcript_chunks.clear()
+                        if flush_output and output_transcript_chunks:
+                            out_text = "".join(output_transcript_chunks).strip()
+                            output_transcript_chunks.clear()
+                        if not in_text and not out_text:
+                            return
+                        try:
+                            async with AsyncSessionLocal() as db_sess:
+                                if in_text:
+                                    await CustomerService.log_interaction(
+                                        db_sess,
+                                        customer_id_str=customer.customer_id,
+                                        speaker="customer",
+                                        message=in_text,
+                                        channel="VOICE_LIVE",
+                                        session_id_str=session_id
+                                    )
+                                    from app.services.checklist_service import ChecklistService
+                                    veh_k = session_mgr.active_vehicle_id or customer.interested_vehicle_id or "thar_roxx"
+                                    new_chk = ChecklistService.extract_checklist_items(in_text, vehicle_id=veh_k)
+                                    if new_chk:
+                                        await ChecklistService.update_customer_and_booking_checklist(
+                                            db_sess,
+                                            customer_id_str=customer.customer_id,
+                                            vehicle_id=veh_k,
+                                            new_items=new_chk
+                                        )
+                                if out_text:
+                                    await CustomerService.log_interaction(
+                                        db_sess,
+                                        customer_id_str=customer.customer_id,
+                                        speaker="mia",
+                                        message=out_text,
+                                        channel="VOICE_LIVE",
+                                        session_id_str=session_id
+                                    )
+                        except Exception as err:
+                            logger.debug(f"Transcript DB persistence notice: {err}")
+
                     try:
                         print(f"[{session_id}] bidi_to_client task started", flush=True)
                         while True:
@@ -528,6 +589,7 @@ Guidelines:
                                 print(f"[{session_id}] Bidi sent keys: {list(bidi_data.keys())}, parts: {len(parts)}", flush=True)
                                 # Check for barge-in interruption per gemini-live-api-dev skill
                                 if server_content.get("interrupted") is True:
+                                    asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=True))
                                     await websocket.send_text(json.dumps({"type": "INTERRUPTED"}))
 
                                 # 1. Check for Gemini Live Tool Calls (e.g. switch_vehicle_showroom)
@@ -572,6 +634,9 @@ Guidelines:
                                 # 2. Process Live Speech-to-Text & Spoken Assistant Transcriptions
                                 out_trans = server_content.get("outputAudioTranscription") or server_content.get("outputTranscription")
                                 if out_trans and out_trans.get("text"):
+                                    if input_transcript_chunks:
+                                        asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=False))
+                                    output_transcript_chunks.append(out_trans["text"])
                                     await websocket.send_text(json.dumps({
                                         "type": "ASSISTANT_RESPONSE",
                                         "speaker": "mia",
@@ -582,39 +647,16 @@ Guidelines:
 
                                 in_trans = server_content.get("inputAudioTranscription") or server_content.get("inputTranscription")
                                 if in_trans and in_trans.get("text"):
+                                    if output_transcript_chunks:
+                                        asyncio.create_task(_persist_turn_transcripts(flush_input=False, flush_output=True))
                                     speech_txt = in_trans["text"]
+                                    input_transcript_chunks.append(speech_txt)
                                     await websocket.send_text(json.dumps({
                                         "type": "USER_TRANSCRIPTION",
                                         "speaker": "customer",
                                         "message": speech_txt,
                                         "is_delta": True
                                     }))
-
-                                    async def _async_log_speech(txt: str):
-                                        try:
-                                            async with AsyncSessionLocal() as db_sess:
-                                                await CustomerService.log_interaction(
-                                                    db_sess,
-                                                    customer_id_str=customer.customer_id,
-                                                    speaker="customer",
-                                                    message=txt,
-                                                    channel="VOICE_LIVE",
-                                                    session_id_str=session_id
-                                                )
-                                                from app.services.checklist_service import ChecklistService
-                                                veh_k = session_mgr.active_vehicle_id or customer.interested_vehicle_id or "thar_roxx"
-                                                new_chk = ChecklistService.extract_checklist_items(txt, vehicle_id=veh_k)
-                                                if new_chk:
-                                                    await ChecklistService.update_customer_and_booking_checklist(
-                                                        db_sess,
-                                                        customer_id_str=customer.customer_id,
-                                                        vehicle_id=veh_k,
-                                                        new_items=new_chk
-                                                    )
-                                        except Exception as err:
-                                            logger.debug(f"Speech log notice: {err}")
-
-                                    asyncio.create_task(_async_log_speech(speech_txt))
 
                                 # 3. Process Video, Audio, FunctionCall, and Text parts
                                 for part in parts:
@@ -667,16 +709,22 @@ Guidelines:
                                                 "mime_type": mime_type or "audio/pcm;rate=24000"
                                             }))
                                     if "text" in part and not (out_trans and out_trans.get("text")):
+                                        output_transcript_chunks.append(part["text"])
                                         await websocket.send_text(json.dumps({
                                             "type": "ASSISTANT_RESPONSE",
                                             "speaker": "mia",
                                             "message": part["text"],
                                             "language": session_mgr.language
                                         }))
+
+                                if server_content.get("turnComplete") is True:
+                                    asyncio.create_task(_persist_turn_transcripts(flush_input=True, flush_output=True))
                             except Exception as e:
                                 logger.debug(f"Error parsing bidi message: {e}")
                     except Exception as e:
                         logger.info(f"Bidi to client loop ended: {e}")
+                    finally:
+                        await _persist_turn_transcripts(flush_input=True, flush_output=True)
 
                 t1 = asyncio.create_task(client_to_bidi())
                 t2 = asyncio.create_task(bidi_to_client())

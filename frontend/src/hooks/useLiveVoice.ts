@@ -143,7 +143,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           if (payload.type === "AUDIO_CHUNK" && payload.audio_b64) {
             audioOutputManagerRef.current?.playAudioChunk(payload.audio_b64);
             setRmsLevel(0.35 + Math.random() * 0.45);
+          } else if (payload.type === "TURN_COMPLETE") {
+            awaitingGreetingRef.current = false;
           } else if (payload.type === "INTERRUPTED") {
+            awaitingGreetingRef.current = false;
             audioOutputManagerRef.current?.interrupt();
             setRmsLevel(0);
           } else if (payload.type === "SESSION_INIT" || payload.type === "SESSION_INITIALIZED") {
@@ -372,6 +375,26 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     }
   };
 
+  const awaitingGreetingRef = useRef<boolean>(false);
+
+  const sendPcmAsJson = (pcmBuffer: ArrayBuffer) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
+    const uint8 = new Uint8Array(pcmBuffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, Array.from(uint8.subarray(i, i + chunkSize)));
+    }
+    const base64Chunk = window.btoa(binary);
+    socketRef.current.send(
+      JSON.stringify({
+        realtimeInput: {
+          mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Chunk }]
+        }
+      })
+    );
+  };
+
   const startVoiceRecording = async (customerName?: string, customerPhone?: string, vehicleId?: string) => {
     if (isStartingRef.current || isRecordingRef.current) {
       return;
@@ -396,6 +419,18 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         vehicle_id: vehicleId || customerInfoRef.current.vehicle_id || "thar_roxx"
       };
     }
+
+    // Ensure WebSocket is connected and OPEN before starting mic stream & greeting
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      connectWebSocket();
+      for (let i = 0; i < 40; i++) {
+        if (socketRef.current && (socketRef.current as WebSocket).readyState === WebSocket.OPEN) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -425,6 +460,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           const { pcm16, rms } = e.data;
           // Only send mic packets when WebSocket is open
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            // Protect initial greeting generation from room noise triggering premature VAD cancellation
+            if (awaitingGreetingRef.current && rms < 0.08) {
+              return;
+            }
             // Echo cancellation gate: when assistant is speaking through speakers,
             // ignore low acoustic mic feedback to prevent Gemini Live from responding to itself
             if (isAssistantSpeakingRef.current && rms < 0.10) {
@@ -434,7 +473,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
               // Deliberate user barge-in: silence assistant immediately
               audioOutputManagerRef.current?.interrupt();
             }
-            socketRef.current.send(pcm16);
+            sendPcmAsJson(pcm16);
           }
         };
 
@@ -457,13 +496,16 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           const rms = Math.sqrt(sum / inputData.length);
 
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            if (awaitingGreetingRef.current && rms < 0.08) {
+              return;
+            }
             if (isAssistantSpeakingRef.current && rms < 0.10) {
               return;
             }
             if (isAssistantSpeakingRef.current && rms >= 0.10) {
               audioOutputManagerRef.current?.interrupt();
             }
-            socketRef.current.send(pcm16.buffer);
+            sendPcmAsJson(pcm16.buffer);
           }
         };
 
@@ -471,55 +513,22 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         // Note: Do NOT connect to audioCtx.destination to prevent microphone feedback loop
       }
 
-// Native audio streaming only - No TTS / STT
-
       // Trigger dynamic greeting from Kavya on starting live session if no messages yet and not greeted yet
       if (messages.length === 0 && !hasGreetedRef.current) {
         hasGreetedRef.current = true;
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+          awaitingGreetingRef.current = true;
+          setTimeout(() => {
+            awaitingGreetingRef.current = false;
+          }, 3000);
           socketRef.current.send(
             JSON.stringify({
               type: "START_SESSION",
-              customer_name: customerName || "there",
+              customer_name: customerName || customerInfoRef.current.name || "there",
+              customer_phone: customerPhone || customerInfoRef.current.phone,
               language: activeLanguageRef.current
             })
           );
-        } else {
-          // If WebSocket is not ready, fetch dynamic greeting via REST immediately
-          (async () => {
-            try {
-              const res = await fetch("/api/live/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  message: `Please give a warm, dynamic, non-static spoken greeting to ${customerName || "there"} as Kavya, introducing yourself as the brand's AI Showroom Specialist.`,
-                  session_id: sessionIdRef.current,
-                  language: activeLanguageRef.current
-                })
-              });
-              if (res.ok) {
-                const data = await res.json();
-                const detectedLang = data.language || activeLanguageRef.current;
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now().toString(),
-                    speaker: "mia",
-                    text: data.message,
-                    timestamp: new Date().toLocaleTimeString(),
-                    toolCall: data.tool_call,
-                    language: detectedLang
-                  }
-                ]);
-
-                if (typeof window !== "undefined" && "speechSynthesis" in window) {
-                  window.speechSynthesis.cancel();
-                }
-              }
-            } catch (err) {
-              console.debug("Initial greeting REST notice:", err);
-            }
-          })();
         }
       }
 

@@ -240,39 +240,68 @@ export function ChatAvatarPanel({
 
   return (
     <aside className="chat-avatar-panel flex flex-col h-full bg-[#0B0F17]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl">
-      {/* Header Bar */}
-      <div className="avatar-header flex items-center justify-between p-3.5 border-b border-white/10 bg-[#0F1420]/80">
-        <div className="consultant-profile flex items-center gap-3">
-          <div className="relative">
+      {/* Unified Aesthetic Header Bar */}
+      <div className="avatar-header relative flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-[#0F1523] via-[#131B2E] to-[#0F1523] overflow-hidden shrink-0">
+        {/* Subtle Ambient Glow behind header */}
+        <div
+          className="absolute -left-6 -top-6 w-28 h-28 rounded-full blur-2xl pointer-events-none transition-opacity duration-300"
+          style={{
+            backgroundColor: primaryColor,
+            opacity: isRecording ? Math.min(0.45, 0.2 + rmsLevel * 0.5) : 0.12
+          }}
+        />
+
+        <div className="consultant-profile relative z-10 flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-sm shadow-md"
-              style={{ backgroundColor: primaryColor }}
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-lg border border-white/20 transition-transform duration-150"
+              style={{
+                background: `linear-gradient(135deg, ${primaryColor}, #1e293b)`,
+                transform: isAssistantSpeaking ? "scale(1.06)" : "scale(1)"
+              }}
             >
               {agentName.charAt(0)}
             </div>
             <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#0B0F17] ${
-                isRecording ? "bg-emerald-500 animate-pulse" : "bg-slate-500"
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0F1523] ${
+                isAssistantSpeaking
+                  ? "bg-cyan-400 animate-ping"
+                  : isRecording
+                  ? "bg-emerald-400 animate-pulse"
+                  : "bg-emerald-500"
               }`}
             />
           </div>
-          <div>
-            <div className="consultant-name flex items-center gap-2">
-              <span className="text-sm font-bold text-white">{agentName}</span>
-              <span
-                className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border text-white"
-                style={{
-                  backgroundColor: `${primaryColor}25`,
-                  borderColor: `${primaryColor}60`
-                }}
-              >
-                {brandName} Voice AI
-              </span>
+
+          <div className="min-w-0">
+            <div className="consultant-name flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-black tracking-tight text-white">{agentName}</span>
+              {isAssistantSpeaking ? (
+                <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 flex items-center gap-1 animate-pulse">
+                  <Activity className="w-2.5 h-2.5 text-cyan-400" />
+                  Speaking
+                </span>
+              ) : isRecording ? (
+                <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Listening
+                </span>
+              ) : (
+                <span
+                  className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border text-white/90"
+                  style={{
+                    backgroundColor: `${primaryColor}25`,
+                    borderColor: `${primaryColor}55`
+                  }}
+                >
+                  Gemini Live
+                </span>
+              )}
               {isVerified && name && (
                 <button
                   type="button"
                   onClick={() => setIsVerified(false)}
-                  className="text-[9px] text-cyan-400 hover:text-white bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-800/60 px-1.5 py-0.5 rounded-full font-mono flex items-center gap-1 cursor-pointer transition-all"
+                  className="text-[9.5px] text-cyan-300 hover:text-white bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-800/60 px-1.5 py-0.5 rounded-full font-mono flex items-center gap-1 cursor-pointer transition-all"
                   title="Click to edit name and phone number"
                 >
                   <CheckCircle2 className="w-2.5 h-2.5 text-cyan-400" />
@@ -281,15 +310,40 @@ export function ChatAvatarPanel({
                 </button>
               )}
             </div>
-            <div className="consultant-title text-[11px] text-slate-400 flex items-center gap-1">
-              <Radio className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
-              <span>Gemini Live Audio • {brandName} Specialist</span>
+            <div className="consultant-title text-[11px] text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
+              <Radio className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+              <span className="truncate">{brandName} Specialist</span>
             </div>
           </div>
         </div>
 
-        <div className="avatar-header-actions flex items-center gap-2">
-          {isVerified || messages.length > 0 ? (
+        <div className="avatar-header-actions relative z-10 flex items-center gap-2 shrink-0">
+          {/* Inline Mini Waveform when session active */}
+          {(isVerified || messages.length > 0 || isRecording) && (
+            <div className="hidden sm:flex items-center gap-0.5 px-2 py-1.5 bg-black/30 rounded-xl border border-white/5 h-7">
+              {visualizerBars.slice(0, 5).map((multiplier, idx) => {
+                const baseHeight = isRecording || isAssistantSpeaking
+                  ? Math.max(4, Math.min(16, rmsLevel * 28 * multiplier))
+                  : 4;
+                return (
+                  <span
+                    key={idx}
+                    className="w-0.5 rounded-full transition-all duration-75"
+                    style={{
+                      height: `${baseHeight}px`,
+                      backgroundColor: isAssistantSpeaking
+                        ? "#22d3ee"
+                        : isRecording
+                        ? primaryColor
+                        : "#475569"
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {isVerified || messages.length > 0 || isRecording ? (
             !isRecording ? (
               <button
                 id="connectBtn"
@@ -298,12 +352,12 @@ export function ChatAvatarPanel({
                 onClick={() => onToggleRecording(name, phone, activeVehicleId)}
                 title={`Start Live Voice Consultation with ${agentName}`}
               >
-                <Power className="w-3.5 h-3.5" /> Start Live
+                <Mic className="w-3.5 h-3.5" /> Start Live
               </button>
             ) : (
               <button
                 id="disconnectBtn"
-                className="btn-secondary-disconnect flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 text-xs font-bold transition-all cursor-pointer"
+                className="btn-secondary-disconnect flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/25 hover:bg-red-600/35 text-red-200 border border-red-500/40 text-xs font-bold transition-all cursor-pointer shadow-sm"
                 onClick={() => onToggleRecording()}
                 title="End Live Voice Consultation"
               >
@@ -315,7 +369,7 @@ export function ChatAvatarPanel({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+              className="p-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
               title="Close Audio Chat"
             >
               <X className="w-4 h-4" />
@@ -487,89 +541,6 @@ export function ChatAvatarPanel({
         </div>
       ) : (
         <div className="avatar-content-stage flex-1 p-3 flex flex-col gap-2.5 min-h-0 overflow-hidden">
-          {/* Audio Chatbot Live Visualizer Card */}
-          <div className="bg-[#121826] border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-inner shrink-0">
-            {/* Ambient Background Glow */}
-            <div
-              className="absolute w-40 h-40 rounded-full blur-2xl pointer-events-none transition-opacity duration-300"
-              style={{
-                backgroundColor: primaryColor,
-                opacity: isRecording ? Math.min(0.4, 0.15 + rmsLevel * 0.5) : 0.08
-              }}
-            />
-
-            {/* Central Audio Persona Orb */}
-            <div className="relative z-10 flex items-center gap-4 w-full justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="relative w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg shadow-md border border-white/20 transition-transform duration-150"
-                  style={{
-                    backgroundColor: primaryColor,
-                    transform: isAssistantSpeaking ? "scale(1.08)" : "scale(1)"
-                  }}
-                >
-                  {agentName.charAt(0)}
-                  {isRecording && (
-                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#121826] flex items-center justify-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span>{agentName}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">• {brandName} Specialist</span>
-                  </div>
-                  <div className="text-[10.5px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    {isAssistantSpeaking ? (
-                      <span className="text-cyan-400 font-bold flex items-center gap-1 animate-pulse">
-                        <Activity className="w-3 h-3 text-cyan-400" />
-                        Speaking...
-                      </span>
-                    ) : isRecording ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Listening...
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">Audio Standby</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Waveform Visualizer */}
-              <div className="flex items-center gap-1 px-3 py-2 bg-black/40 rounded-xl border border-white/5">
-                {visualizerBars.map((multiplier, idx) => {
-                  const baseHeight = isRecording ? Math.max(4, Math.min(24, rmsLevel * 40 * multiplier)) : 4;
-                  return (
-                    <span
-                      key={idx}
-                      className="w-1 rounded-full transition-all duration-75"
-                      style={{
-                        height: `${baseHeight}px`,
-                        backgroundColor: isRecording ? primaryColor : "#475569"
-                      }}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Audio Mic Action Button */}
-              <button
-                onClick={() => onToggleRecording(name, phone, activeVehicleId)}
-                className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-md ${
-                  isRecording
-                    ? "bg-red-600 text-white border-red-500 shadow-red-600/30 hover:scale-105"
-                    : "bg-white/5 text-slate-300 border-white/10 hover:text-white hover:bg-white/10"
-                }`}
-                title={isRecording ? "Mute Microphone" : "Unmute Microphone"}
-              >
-                {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
           {/* Conversation Chat Window */}
           <div id="chat-container" className="live-chat-box flex-1 flex flex-col min-h-0 bg-[#0E1420] border border-white/10 rounded-2xl overflow-hidden">
             <div className="chat-box-header flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/20 text-xs">

@@ -418,7 +418,8 @@ Guidelines:
                                 break
                             if "text" in data and data["text"]:
                                 payload = json.loads(data["text"])
-                                print(f"[{session_id}] Received text payload: {payload.get('type')}", flush=True)
+                                if "realtimeInput" not in payload:
+                                    print(f"[{session_id}] Received text payload: {payload.get('type')}", flush=True)
                                 if "realtimeInput" in payload or "clientContent" in payload or "toolResponse" in payload:
                                     await bidi_ws.send(data["text"])
                                 else:

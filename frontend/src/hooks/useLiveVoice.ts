@@ -519,23 +519,75 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     if (audioOutputManagerRef.current) {
       await audioOutputManagerRef.current.initializeAudioContext();
     }
-    if (customerName || customerPhone || vehicleId) {
-      customerInfoRef.current = {
-        name: customerName || customerInfoRef.current.name,
-        phone: customerPhone || customerInfoRef.current.phone,
-        vehicle_id: vehicleId || customerInfoRef.current.vehicle_id || "thar_roxx"
-      };
+    const resolvedName = (customerName || customerInfoRef.current.name || "").trim();
+    const resolvedPhone = (customerPhone || customerInfoRef.current.phone || "").trim();
+    const resolvedVehicle = vehicleId || customerInfoRef.current.vehicle_id || "thar_roxx";
+
+    // Generate a fresh unique session_id for each new conversation so multiple conversations are tracked separately
+    const freshSessionId =
+      "SESS-" +
+      new Date().toISOString().slice(0, 10).replace(/-/g, "") +
+      "-" +
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+    sessionIdRef.current = freshSessionId;
+    hasGreetedRef.current = false;
+    setMessages([]);
+    messagesRef.current = [];
+
+    if (resolvedName && resolvedPhone) {
+      try {
+        const res = await fetch("/api/customer/identify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: resolvedName,
+            phone: resolvedPhone,
+            session_type: "LIVE_CALL",
+            vehicle_id: resolvedVehicle
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.session_id) {
+            sessionIdRef.current = data.session_id;
+          }
+          customerInfoRef.current = {
+            customer_id: data.customer_id || customerInfoRef.current.customer_id,
+            name: data.name || resolvedName,
+            phone: data.phone || resolvedPhone,
+            vehicle_id: resolvedVehicle
+          };
+        } else {
+          customerInfoRef.current = {
+            ...customerInfoRef.current,
+            name: resolvedName,
+            phone: resolvedPhone,
+            vehicle_id: resolvedVehicle
+          };
+        }
+      } catch (e) {
+        customerInfoRef.current = {
+          ...customerInfoRef.current,
+          name: resolvedName,
+          phone: resolvedPhone,
+          vehicle_id: resolvedVehicle
+        };
+      }
     }
 
-    // Ensure WebSocket is connected and OPEN before starting mic stream & greeting
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      connectWebSocket();
-      for (let i = 0; i < 40; i++) {
-        if (socketRef.current && (socketRef.current as WebSocket).readyState === WebSocket.OPEN) {
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 100));
+    // Always open a fresh WebSocket bound to this customer (Name + Phone) and this conversation's session_id
+    if (socketRef.current) {
+      try {
+        socketRef.current.close();
+      } catch (e) {}
+      socketRef.current = null;
+    }
+    connectWebSocket();
+    for (let i = 0; i < 40; i++) {
+      if (socketRef.current && (socketRef.current as WebSocket).readyState === WebSocket.OPEN) {
+        break;
       }
+      await new Promise((r) => setTimeout(r, 100));
     }
 
     try {

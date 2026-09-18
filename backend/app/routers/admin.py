@@ -101,21 +101,24 @@ async def get_admin_bookings(
         if lg.customer_id:
             logs_by_cust.setdefault(lg.customer_id, []).append(lg)
 
+    from app.services.customer_service import clean_name
     admin_records = []
-    seen_customer_phones = set()
+    seen_customer_keys = set()
 
-    # Process confirmed bookings (1 row per unique customer phone)
+    # Process confirmed bookings (1 row per unique customer Name + Phone Number)
     for b in bookings:
         cust = b.customer
         cust_id = cust.id if cust else None
         cust_name = cust.name if cust else "Valued Customer"
         cust_phone = cust.phone if cust else ""
         norm_phone = clean_phone(cust_phone) if cust_phone else f"NOPHONE-{b.id}"
+        norm_name = (clean_name(cust_name) or cust_name).lower()
+        composite_key = (norm_name, norm_phone)
 
-        # Deduplicate: exactly 1 row per unique customer phone
-        if norm_phone in seen_customer_phones:
+        # Deduplicate: strictly 1 row per unique customer (Name + Phone Number)
+        if composite_key in seen_customer_keys:
             continue
-        seen_customer_phones.add(norm_phone)
+        seen_customer_keys.add(composite_key)
 
         dealership_city = dealer_city_map.get(b.dealership_id, cust.city if cust else "Mumbai")
         cust_city = dealership_city or (cust.city if cust else "Mumbai")
@@ -327,9 +330,11 @@ async def get_admin_bookings(
 
     for c in all_customers:
         norm_p = clean_phone(c.phone) if c.phone else f"CUST-{c.id}"
-        if norm_p in seen_customer_phones:
+        norm_n = (clean_name(c.name) or c.name).lower()
+        composite_key = (norm_n, norm_p)
+        if composite_key in seen_customer_keys:
             continue
-        seen_customer_phones.add(norm_p)
+        seen_customer_keys.add(composite_key)
 
         c_brand_id = c.brand_id or b_id or "mahindra"
         active_b = BrandService.get_brand(c_brand_id)

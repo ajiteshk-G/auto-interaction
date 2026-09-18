@@ -187,13 +187,6 @@ export function ChatAvatarPanel({
     }
 
     setIsVerified(true);
-    identifyCustomer({
-      name: name.trim(),
-      phone: phone.trim(),
-      session_type: "LIVE_CALL",
-      vehicle_id: activeVehicleId
-    }).catch((err) => console.debug("Identify customer notice:", err));
-
     onToggleRecording(name.trim(), phone.trim(), activeVehicleId);
   };
 

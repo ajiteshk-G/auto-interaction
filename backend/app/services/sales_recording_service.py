@@ -58,16 +58,208 @@ def _create_synthetic_wav_file(filepath: str):
 
 class SalesRecordingService:
     @staticmethod
+    def _build_customer_conversation_intelligence(
+        customer: Optional[Customer],
+        sessions: List[Any],
+        logs: List[InteractionLog],
+        default_vehicle_id: str = "thar_roxx"
+    ) -> Dict[str, Any]:
+        """
+        Groups all conversations for a unique (Name + Phone Number) customer by calendar day,
+        extracting the interested car, interested features, and budget for each conversation and each day.
+        """
+        from app.services.customer_service import extract_conversation_intelligence, VEHICLE_PRICE_MAP
+        from app.schemas.sales_recording import (
+            ConversationTurnItem,
+            ConversationSessionSummary,
+            DailyConversationGroup
+        )
+
+        cust_budget = customer.budget_range if customer else None
+        fallback_vid = default_vehicle_id or (customer.interested_vehicle_id if customer else "thar_roxx") or "thar_roxx"
+
+        # Map logs by session_id (DB integer ID) and also handle orphan logs
+        logs_by_sess_id: Dict[int, List[InteractionLog]] = {}
+        orphan_logs: List[InteractionLog] = []
+        for lg in sorted(logs, key=lambda x: x.created_at or datetime.min):
+            if lg.channel == "TEST_RIDE_IN_VEHICLE" or lg.speaker == "system":
+                continue
+            if lg.session_id:
+                logs_by_sess_id.setdefault(lg.session_id, []).append(lg)
+            else:
+                orphan_logs.append(lg)
+
+        session_summaries: List[ConversationSessionSummary] = []
+        all_cars: List[str] = []
+        all_features: List[str] = []
+        latest_budget: Optional[str] = cust_budget
+
+        sorted_sessions = sorted(sessions, key=lambda s: s.created_at or datetime.min, reverse=True)
+
+        for sess in sorted_sessions:
+            s_logs = logs_by_sess_id.get(sess.id, [])
+            # If multiple sessions exist, skip completely empty 0-turn shell sessions if other sessions have turns
+            if not s_logs and len(sorted_sessions) > 1:
+                continue
+
+            msg_dicts = [{"speaker": l.speaker, "message": l.message} for l in s_logs]
+            parsed_summary = None
+            if sess.summary and sess.summary.strip().startswith("{"):
+                try:
+                    parsed_summary = json.loads(sess.summary)
+                except Exception:
+                    parsed_summary = None
+
+            if not parsed_summary or s_logs:
+                parsed_summary = extract_conversation_intelligence(
+                    msg_dicts,
+                    default_vehicle_id=sess.vehicle_id or fallback_vid,
+                    existing_budget=cust_budget
+                )
+
+            car_name = parsed_summary.get("primary_vehicle_name") or VEHICLE_PRICE_MAP.get(sess.vehicle_id or fallback_vid, ("Mahindra Thar ROXX", ""))[0]
+            sess_cars = parsed_summary.get("interested_cars") or [car_name]
+            sess_feats = parsed_summary.get("interested_features") or ["SUV Styling & Road Presence", "Cabin Comfort & Infotainment"]
+            sess_budget = parsed_summary.get("budget") or cust_budget or VEHICLE_PRICE_MAP.get(sess.vehicle_id or fallback_vid, ("", "₹15.00 Lakh – ₹22.50 Lakh"))[1]
+            key_points = parsed_summary.get("key_points_summary") or f"Interested in {car_name} | Focus: {', '.join(sess_feats[:3])} | Budget: {sess_budget}"
+
+            for c_item in sess_cars:
+                if c_item not in all_cars:
+                    all_cars.append(c_item)
+            for f_item in sess_feats:
+                if f_item not in all_features:
+                    all_features.append(f_item)
+            if sess_budget and (not latest_budget or latest_budget == "Standard Range"):
+                latest_budget = sess_budget
+
+            dt = sess.created_at or datetime.now(timezone.utc)
+            date_key = dt.strftime("%Y-%m-%d")
+            date_label = dt.strftime("%a, %d %b %Y")
+            time_label = dt.strftime("%I:%M %p")
+
+            turn_items = [
+                ConversationTurnItem(
+                    speaker=customer.name if (l.speaker == "customer" and customer) else ("Customer" if l.speaker == "customer" else "Kavya (AI Specialist)"),
+                    role=l.speaker,
+                    message=l.message,
+                    timestamp=l.created_at.strftime("%I:%M %p") if l.created_at else time_label
+                )
+                for l in s_logs
+            ]
+
+            session_summaries.append(ConversationSessionSummary(
+                session_id=sess.session_id,
+                date_key=date_key,
+                date_label=date_label,
+                time_label=time_label,
+                channel="LIVE_VOICE" if sess.session_type in ("LIVE_CALL", "VOICE_LIVE") else "CHAT_BOT",
+                interested_car=", ".join(sess_cars[:2]),
+                interested_features=sess_feats,
+                budget=sess_budget,
+                key_points_summary=key_points,
+                turn_count=len(turn_items),
+                turns=turn_items
+            ))
+
+        # Also include orphan logs if no session captured them
+        if orphan_logs and not session_summaries:
+            msg_dicts = [{"speaker": l.speaker, "message": l.message} for l in orphan_logs]
+            intel = extract_conversation_intelligence(msg_dicts, default_vehicle_id=fallback_vid, existing_budget=cust_budget)
+            dt = orphan_logs[-1].created_at or datetime.now(timezone.utc)
+            date_key = dt.strftime("%Y-%m-%d")
+            date_label = dt.strftime("%a, %d %b %Y")
+            time_label = dt.strftime("%I:%M %p")
+            for c_item in intel["interested_cars"]:
+                if c_item not in all_cars:
+                    all_cars.append(c_item)
+            for f_item in intel["interested_features"]:
+                if f_item not in all_features:
+                    all_features.append(f_item)
+            latest_budget = intel["budget"]
+            turn_items = [
+                ConversationTurnItem(
+                    speaker=customer.name if (l.speaker == "customer" and customer) else ("Customer" if l.speaker == "customer" else "Kavya (AI Specialist)"),
+                    role=l.speaker,
+                    message=l.message,
+                    timestamp=l.created_at.strftime("%I:%M %p") if l.created_at else time_label
+                )
+                for l in orphan_logs
+            ]
+            session_summaries.append(ConversationSessionSummary(
+                session_id=f"SESS-{dt.strftime('%Y%m%d-%H%M')}",
+                date_key=date_key,
+                date_label=date_label,
+                time_label=time_label,
+                channel="LIVE_VOICE",
+                interested_car=", ".join(intel["interested_cars"][:2]),
+                interested_features=intel["interested_features"],
+                budget=intel["budget"],
+                key_points_summary=intel["key_points_summary"],
+                turn_count=len(turn_items),
+                turns=turn_items
+            ))
+
+        if not all_cars:
+            def_car = VEHICLE_PRICE_MAP.get(fallback_vid, (fallback_vid.replace("_", " ").title(), "₹15.00 Lakh – ₹22.50 Lakh"))[0]
+            all_cars.append(def_car)
+        if not all_features:
+            all_features = ["SUV Styling & Road Presence", "Cabin Comfort & Infotainment"]
+        if not latest_budget or latest_budget == "Standard Range":
+            latest_budget = VEHICLE_PRICE_MAP.get(fallback_vid, ("", "₹15.00 Lakh – ₹22.50 Lakh"))[1]
+
+        # Group sessions by calendar day (date_key descending)
+        day_groups_map: Dict[str, List[ConversationSessionSummary]] = {}
+        day_labels_map: Dict[str, str] = {}
+        for s_sum in session_summaries:
+            day_groups_map.setdefault(s_sum.date_key, []).append(s_sum)
+            day_labels_map[s_sum.date_key] = s_sum.date_label
+
+        conversations_by_day: List[DailyConversationGroup] = []
+        for d_key in sorted(day_groups_map.keys(), reverse=True):
+            d_sessions = day_groups_map[d_key]
+            d_cars: List[str] = []
+            d_feats: List[str] = []
+            d_budget = d_sessions[0].budget if d_sessions else latest_budget
+            for ds in d_sessions:
+                for c_part in [x.strip() for x in ds.interested_car.split(",") if x.strip()]:
+                    if c_part not in d_cars:
+                        d_cars.append(c_part)
+                for f_part in ds.interested_features:
+                    if f_part not in d_feats:
+                        d_feats.append(f_part)
+
+            conversations_by_day.append(DailyConversationGroup(
+                date_key=d_key,
+                date_label=day_labels_map[d_key],
+                conversation_count=len(d_sessions),
+                cars_discussed=d_cars,
+                features_interested=d_feats[:5],
+                budget_mentioned=d_budget,
+                sessions=d_sessions
+            ))
+
+        return {
+            "total_conversations": len(session_summaries),
+            "interested_cars": all_cars,
+            "interested_features": all_features[:6],
+            "budget_range": latest_budget,
+            "conversations_by_day": conversations_by_day,
+        }
+
+    @staticmethod
     async def get_sales_leads(
         db: AsyncSession,
         dealership_id: Optional[str] = None,
         brand_id: Optional[str] = None
     ) -> List[TestRideLeadItem]:
         """
-        Fetch qualified leads for the Sales Mobile App with fast TTL caching scoped to brand.
-        Strictly 1 lead row per unique customer (identified by unique normalized phone number).
-        Shows the customer's latest active test ride booking.
+        Fetch qualified leads for the Sales Consultant App scoped to brand.
+        Strictly 1 lead row per unique customer (identified by Unique Name + Phone Number).
+        Includes per-day conversation breakdown, interested car(s), interested features, and budget.
         """
+        from app.models.customer import ConversationSession
+        from app.services.customer_service import clean_name
+
         b_id = (brand_id or (BrandService.get_active_brand().id if BrandService.get_active_brand() else "mahindra")).lower()
         cache_key = f"sales_leads_{b_id}_{dealership_id or 'all'}"
         cached = cache.get(cache_key)
@@ -88,14 +280,20 @@ class SalesRecordingService:
         bookings = booking_res.scalars().all()
 
         leads: List[TestRideLeadItem] = []
-        seen_phones = set()
+        seen_customer_keys = set()
 
-        # Batch prefetch Customers and Recordings to eliminate N+1 latency
-        customer_ids = list({b.customer_id for b in bookings})
-        cust_map = {}
-        if customer_ids:
-            cust_res = await db.execute(select(Customer).where(Customer.id.in_(customer_ids)))
-            cust_map = {c.id: c for c in cust_res.scalars().all()}
+        # Batch prefetch all Customers, Sessions, InteractionLogs, and Recordings for this brand
+        all_cust_res = await db.execute(
+            select(Customer)
+            .where(Customer.brand_id == b_id)
+            .options(
+                selectinload(Customer.sessions),
+                selectinload(Customer.interactions)
+            )
+            .order_by(Customer.updated_at.desc())
+        )
+        all_customers_list = all_cust_res.scalars().all()
+        cust_map = {c.id: c for c in all_customers_list}
 
         rec_res = await db.execute(
             select(TestRideRecording.booking_reference, TestRideRecording.customer_id)
@@ -113,20 +311,28 @@ class SalesRecordingService:
             cust_id_str = c.customer_id if c else f"CUST-{b.customer_id}"
 
             norm_phone = clean_phone(cust_phone) if cust_phone else f"NOPHONE-{b.customer_id}"
+            norm_name = (clean_name(cust_name) or cust_name).lower()
+            composite_key = (norm_name, norm_phone)
             
-            if norm_phone in seen_phones:
+            if composite_key in seen_customer_keys:
                 continue
-            seen_phones.add(norm_phone)
+            seen_customer_keys.add(composite_key)
+
+            intel_data = SalesRecordingService._build_customer_conversation_intelligence(
+                customer=c,
+                sessions=list(c.sessions) if c else [],
+                logs=list(c.interactions) if c else [],
+                default_vehicle_id=b.vehicle_id
+            )
 
             v_info = CatalogService.get_vehicle_by_id(b.vehicle_id)
             veh_name = v_info.name if v_info else b.vehicle_id.replace("_", " ").title()
 
             db_checklist = b.advisor_checklist or (c.advisor_checklist if c else None)
             is_custom = bool(db_checklist and len(db_checklist) > 0)
-            final_checklist = db_checklist if is_custom else CatalogService.get_static_checklist(b.vehicle_id)
+            final_checklist = db_checklist if is_custom else [f"Demonstrate / Highlight {f}" for f in intel_data["interested_features"][:4]]
 
             has_tr_rec = b.booking_reference in existing_rec_refs
-
             resolved_status = "TestRide_Completed" if (b.status == "TestRide_Completed" or has_tr_rec) else (b.status or "CONFIRMED")
 
             leads.append(TestRideLeadItem(
@@ -147,34 +353,39 @@ class SalesRecordingService:
                 delivery_address=b.delivery_address,
                 booking_status=resolved_status,
                 scheduled_slot=f"{b.scheduled_date} at {b.scheduled_time_slot}",
-                presales_notes=f"Test drive booked for {veh_name} ({b.variant}) at {b.dealership_name}. Booking Ref: {b.booking_reference}.",
+                presales_notes=f"Interested in {', '.join(intel_data['interested_cars'])} | Features: {', '.join(intel_data['interested_features'][:3])} | Budget: {intel_data['budget_range']}",
                 advisor_checklist=final_checklist,
-                is_custom_checklist=is_custom
+                is_custom_checklist=True,
+                total_conversations=intel_data["total_conversations"],
+                interested_cars=intel_data["interested_cars"],
+                interested_features=intel_data["interested_features"],
+                budget_range=intel_data["budget_range"],
+                conversations_by_day=intel_data["conversations_by_day"]
             ))
 
         if not dealership_id or dealership_id == "ALL":
-            cust_stmt = (
-                select(Customer)
-                .where(Customer.brand_id == b_id)
-                .order_by(Customer.updated_at.desc())
-                .limit(10)
-            )
-            cust_res = await db.execute(cust_stmt)
-            customers = cust_res.scalars().all()
-
             active_brand = BrandService.get_brand(b_id)
             def_dlr_name = (active_brand.dealerships[0].name if active_brand and active_brand.dealerships else f"{b_id.title()} Official Dealership")
             def_dlr_id = (active_brand.dealerships[0].id if active_brand and active_brand.dealerships else f"{b_id}_flagship")
 
-            for c in customers:
+            for c in all_customers_list:
                 norm_phone = clean_phone(c.phone) if c.phone else f"NOPHONE-{c.id}"
-                if norm_phone not in seen_phones:
-                    seen_phones.add(norm_phone)
+                norm_name = (clean_name(c.name) or c.name).lower()
+                composite_key = (norm_name, norm_phone)
+                if composite_key not in seen_customer_keys:
+                    seen_customer_keys.add(composite_key)
+                    intel_data = SalesRecordingService._build_customer_conversation_intelligence(
+                        customer=c,
+                        sessions=list(c.sessions),
+                        logs=list(c.interactions),
+                        default_vehicle_id=c.interested_vehicle_id or "thar_roxx"
+                    )
+
                     v_info = CatalogService.get_vehicle_by_id(c.interested_vehicle_id or ("bmw_x5" if b_id == "bmw" else "creta" if b_id == "hyundai" else "grand_vitara" if b_id == "maruti_suzuki" else "thar_roxx"))
-                    veh_name = v_info.name if v_info else (c.interested_vehicle_id or "Vehicle").replace("_", " ").title()
+                    veh_name = v_info.name if v_info else (intel_data["interested_cars"][0] if intel_data["interested_cars"] else "Mahindra Thar ROXX")
                     db_checklist = c.advisor_checklist
                     is_custom = bool(db_checklist and len(db_checklist) > 0)
-                    final_checklist = db_checklist if is_custom else CatalogService.get_static_checklist(c.interested_vehicle_id or "thar_roxx")
+                    final_checklist = db_checklist if is_custom else [f"Demonstrate / Highlight {f}" for f in intel_data["interested_features"][:4]]
 
                     tr_rec_stmt = select(TestRideRecording).where(TestRideRecording.customer_id == c.id, TestRideRecording.brand_id == b_id)
                     tr_res = await db.execute(tr_rec_stmt)
@@ -190,18 +401,24 @@ class SalesRecordingService:
                         email=c.email,
                         city=c.city or "Mumbai",
                         preferred_vehicle=f"{veh_name} ({c.interested_variant or 'Official Variant'})",
+                        vehicle_name=veh_name,
                         vehicle_id=c.interested_vehicle_id or ("bmw_x5" if b_id == "bmw" else "thar_roxx"),
                         variant=c.interested_variant or "Official Variant",
                         dealership_name=def_dlr_name,
                         dealership_id=def_dlr_id,
                         booking_status=resolved_status,
-                        scheduled_slot="Tomorrow at 11:00 AM",
-                        presales_notes=f"Explored {veh_name} in Virtual Showroom. Inquired about pricing and performance.",
+                        scheduled_slot=f"{intel_data['total_conversations']} Pre-Sales Conversation(s)",
+                        presales_notes=f"Interested in {', '.join(intel_data['interested_cars'])} | Features: {', '.join(intel_data['interested_features'][:3])} | Budget: {intel_data['budget_range']}",
                         advisor_checklist=final_checklist,
-                        is_custom_checklist=is_custom
+                        is_custom_checklist=True,
+                        total_conversations=intel_data["total_conversations"],
+                        interested_cars=intel_data["interested_cars"],
+                        interested_features=intel_data["interested_features"],
+                        budget_range=intel_data["budget_range"],
+                        conversations_by_day=intel_data["conversations_by_day"]
                     ))
 
-        cache.set(cache_key, leads, ttl_seconds=60)
+        cache.set(cache_key, leads, ttl_seconds=15)
         return leads
 
     @staticmethod

@@ -103,6 +103,37 @@ export interface CustomerProfile {
   insurance_type?: string;
 }
 
+export interface ConversationTurnItem {
+  speaker: string;
+  role: string;
+  message: string;
+  timestamp?: string;
+}
+
+export interface ConversationSessionSummary {
+  session_id: string;
+  date_key: string;
+  date_label: string;
+  time_label: string;
+  channel: string;
+  interested_car: string;
+  interested_features: string[];
+  budget: string;
+  key_points_summary: string;
+  turn_count: number;
+  turns: ConversationTurnItem[];
+}
+
+export interface DailyConversationGroup {
+  date_key: string;
+  date_label: string;
+  conversation_count: number;
+  cars_discussed: string[];
+  features_interested: string[];
+  budget_mentioned: string;
+  sessions: ConversationSessionSummary[];
+}
+
 // Stage 2: Sales Mobile App & Test Ride Insights
 export interface TestRideLeadItem {
   customer_id: string;
@@ -111,6 +142,7 @@ export interface TestRideLeadItem {
   email?: string;
   city: string;
   preferred_vehicle: string;
+  vehicle_name?: string;
   vehicle_id?: string;
   variant?: string;
   booking_reference?: string;
@@ -123,6 +155,11 @@ export interface TestRideLeadItem {
   presales_notes?: string;
   advisor_checklist?: string[];
   is_custom_checklist?: boolean;
+  total_conversations?: number;
+  interested_cars?: string[];
+  interested_features?: string[];
+  budget_range?: string;
+  conversations_by_day?: DailyConversationGroup[];
 }
 
 export interface TestRideInsightResponse {

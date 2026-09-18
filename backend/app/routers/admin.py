@@ -471,11 +471,11 @@ async def get_admin_bookings(
 async def clear_users_and_transcripts(db: AsyncSession = Depends(get_db)):
     """
     Cleans all Users, Conversation Sessions, Interaction Logs (Transcripts),
-    Test Drive Bookings, Slot Reservations, Test Ride Recordings, Outbound Call Logs,
-    and Warranty Claims from the database while preserving Dealerships, Slot Configs, and Holidays.
+    Test Drive Bookings, Slot Reservations, Test Ride Recordings, and Outbound Call Logs
+    from the database while preserving Dealerships, Slot Configs, and Holidays.
     """
     from sqlalchemy import delete
-    from app.models.customer import WarrantyClaim
+    from app.services.cache_service import cache
 
     for model in [
         InteractionLog,
@@ -484,7 +484,6 @@ async def clear_users_and_transcripts(db: AsyncSession = Depends(get_db)):
         OutboundCallLog,
         TestDriveBooking,
         TestDriveSlot,
-        WarrantyClaim,
         Customer,
     ]:
         try:
@@ -492,6 +491,7 @@ async def clear_users_and_transcripts(db: AsyncSession = Depends(get_db)):
         except Exception:
             pass
     await db.commit()
+    cache.invalidate("sales_leads_")
 
     return {
         "status": "success",

@@ -377,9 +377,6 @@ Guidelines:
                         "parts": [{"text": active_system_prompt}]
                     }
                 }
-                if settings.AVATAR_MODALITY == "VIDEO" and not is_outbound:
-                    setup_dict["avatarConfig"] = {"avatarName": settings.AVATAR_NAME or "Kabir"}
-
                 setup_msg = {
                     "setup": setup_dict
                 }
@@ -638,13 +635,9 @@ Guidelines:
                                     if "inlineData" in part:
                                         mime_type = part["inlineData"].get("mimeType", "")
                                         data_b64 = part["inlineData"].get("data")
-                                        if mime_type.startswith("video/") or mime_type.startswith("image/"):
-                                            await websocket.send_text(json.dumps({
-                                                "type": "VIDEO_CHUNK",
-                                                "video_b64": data_b64,
-                                                "mime_type": mime_type
-                                            }))
-                                        else:
+                                        # Gemini Live 2.5 native audio only. Discard video/image payloads
+                                        # so a second (avatar) audio track can never be played.
+                                        if not (mime_type.startswith("video/") or mime_type.startswith("image/")):
                                             await websocket.send_text(json.dumps({
                                                 "type": "AUDIO_CHUNK",
                                                 "audio_b64": data_b64,
@@ -677,7 +670,20 @@ Guidelines:
                     task.cancel()
                 return
         except Exception as e:
-            logger.warning(f"Vertex Bidi connection notice (falling back to interactive session): {e}")
+            logger.error(
+                f"Vertex Bidi connection FAILED for model={settings.GEMINI_LIVE_MODEL} "
+                f"location={settings.VERTEX_LOCATION}: {type(e).__name__}: {e}. "
+                "Falling back to text-only interactive session (NO AUDIO)."
+            )
+            try:
+                await websocket.send_text(json.dumps({
+                    "type": "ASSISTANT_RESPONSE",
+                    "session_id": session_id,
+                    "speaker": "system",
+                    "message": f"Live audio unavailable ({settings.GEMINI_LIVE_MODEL}): {e}",
+                }))
+            except Exception:
+                pass
 
     # Resilient local fallback session loop
     try:

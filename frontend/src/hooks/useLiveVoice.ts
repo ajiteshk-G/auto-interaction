@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { LiveAudioOutputManager, LiveVideoOutputManager } from "@/lib/audioManager";
+import { LiveAudioOutputManager } from "@/lib/audioManager";
 import { saveFullSessionTranscript } from "@/lib/api";
 
 export interface LiveMessage {
@@ -35,9 +35,14 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const sessionIdRef = useRef<string>(`SESS-${Date.now()}`);
   const customerInfoRef = useRef<{ name?: string; phone?: string; customer_id?: string; vehicle_id?: string }>({});
   const audioOutputManagerRef = useRef<LiveAudioOutputManager | null>(null);
-  const videoOutputManagerRef = useRef<LiveVideoOutputManager | null>(null);
   const isAssistantSpeakingRef = useRef(false);
   const hasGreetedRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const isRecordingRef = useRef(false);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
 
   useEffect(() => {
     const audioMgr = new LiveAudioOutputManager();
@@ -51,7 +56,6 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       }
     };
     audioOutputManagerRef.current = audioMgr;
-    videoOutputManagerRef.current = new LiveVideoOutputManager();
 
     return () => {
       audioMgr.interrupt();
@@ -136,9 +140,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         try {
           const payload = JSON.parse(event.data);
 
-          if (payload.type === "VIDEO_CHUNK" && payload.video_b64) {
-            videoOutputManagerRef.current?.playVideoChunk(payload.video_b64);
-          } else if (payload.type === "AUDIO_CHUNK" && payload.audio_b64) {
+          if (payload.type === "AUDIO_CHUNK" && payload.audio_b64) {
             audioOutputManagerRef.current?.playAudioChunk(payload.audio_b64);
             setRmsLevel(0.35 + Math.random() * 0.45);
           } else if (payload.type === "INTERRUPTED") {
@@ -371,6 +373,18 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   };
 
   const startVoiceRecording = async (customerName?: string, customerPhone?: string, vehicleId?: string) => {
+    if (isStartingRef.current || isRecordingRef.current) {
+      return;
+    }
+    isStartingRef.current = true;
+    try {
+      await startVoiceRecordingInner(customerName, customerPhone, vehicleId);
+    } finally {
+      isStartingRef.current = false;
+    }
+  };
+
+  const startVoiceRecordingInner = async (customerName?: string, customerPhone?: string, vehicleId?: string) => {
     // Resume / initialize audio output context on user gesture
     if (audioOutputManagerRef.current) {
       await audioOutputManagerRef.current.initializeAudioContext();
@@ -555,13 +569,6 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         window.speechSynthesis.cancel();
-      } catch (e) {}
-    }
-    const video = typeof document !== "undefined" ? (document.getElementById("video_player") as HTMLVideoElement | null) : null;
-    if (video) {
-      try {
-        video.pause();
-        video.currentTime = 0;
       } catch (e) {}
     }
     setIsRecording(false);

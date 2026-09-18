@@ -22,5 +22,6 @@ backend/__pycache__/
 frontend/.next/
 android/
 *package-lock.json
+cloudbuild.yaml
 
 

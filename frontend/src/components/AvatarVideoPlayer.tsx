@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { Sparkles, Volume2 } from "lucide-react";
 
 interface AvatarVideoPlayerProps {
@@ -10,47 +10,12 @@ interface AvatarVideoPlayerProps {
 }
 
 export function AvatarVideoPlayer({ isRecording, rmsLevel, isSpeaking }: AvatarVideoPlayerProps) {
-  const [hasVideoStream, setHasVideoStream] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const video = document.getElementById("video_player") as HTMLVideoElement | null;
-    if (!video) return;
-    videoRef.current = video;
-
-    const handlePlaying = () => setHasVideoStream(true);
-    const handlePause = () => setHasVideoStream(false);
-    const handleEnded = () => setHasVideoStream(false);
-
-    video.addEventListener("playing", handlePlaying);
-    video.addEventListener("pause", handlePause);
-    video.addEventListener("ended", handleEnded);
-
-    return () => {
-      video.removeEventListener("playing", handlePlaying);
-      video.removeEventListener("pause", handlePause);
-      video.removeEventListener("ended", handleEnded);
-    };
-  }, []);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-2xl bg-[#020408]">
-      {/* HTML5 Live Video Element (only rendered when video stream exists) */}
-      <video
-        id="video_player"
-        autoPlay
-        playsInline
-        muted={false}
-        className={`w-full h-full object-cover rounded-2xl z-10 transition-opacity duration-300 ${
-          hasVideoStream ? "opacity-100 block" : "opacity-0 pointer-events-none hidden"
-        }`}
-      />
-
-      {/* Standby / Active Audio Stage with Ambient Ripple */}
+      {/* Gemini Live 2.5 native-audio stage (no avatar video track) */}
       <div
-        className={`absolute inset-0 z-0 bg-gradient-to-b from-[#0F172A] to-[#060912] flex flex-col items-center justify-center p-4 transition-opacity duration-300 ${
-          hasVideoStream ? "opacity-0 pointer-events-none" : "opacity-100"
-        }`}
+        className="absolute inset-0 z-0 bg-gradient-to-b from-[#0F172A] to-[#060912] flex flex-col items-center justify-center p-4"
       >
         <div className="relative flex flex-col items-center justify-center">
           {/* Ambient Glow */}

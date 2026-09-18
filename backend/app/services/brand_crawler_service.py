@@ -405,9 +405,33 @@ class BrandCrawlerService:
 
         return catalog
 
+    @staticmethod
+    def _is_safe_public_url(url: str) -> bool:
+        import ipaddress
+        import socket
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                return False
+            host = parsed.hostname.lower()
+            if host in ("localhost", "metadata.google.internal") or host.endswith(".internal"):
+                return False
+            for _, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+                ip = ipaddress.ip_address(sockaddr[0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                    return False
+            return True
+        except Exception:
+            return False
+
     @classmethod
     async def _fetch_and_parse_page(cls, client: httpx.AsyncClient, url: str) -> Dict[str, Any]:
         try:
+            if not cls._is_safe_public_url(url):
+                logger.warning(f"Blocked unsafe or private URL in brand crawler: {url}")
+                return {"url": url, "error": "Unsafe or private URL blocked"}
             resp = await client.get(url)
             if resp.status_code >= 400:
                 logger.warning(f"HTTP {resp.status_code} fetching {url}")

@@ -69,6 +69,7 @@ export function SalesMobileApp({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [insights, setInsights] = useState<TestRideInsightResponse | null>(null);
   const [checkedChecklist, setCheckedChecklist] = useState<Record<string, boolean>>({});
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
   const toggleChecklistItem = (item: string) => {
     setCheckedChecklist((prev) => ({
@@ -451,58 +452,87 @@ export function SalesMobileApp({
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {leads.map((lead, idx) => {
                           const isSelected = selectedLead?.customer_id === lead.customer_id;
+                          const convCount = lead.total_conversations || lead.conversations_by_day?.reduce((acc, d) => acc + d.conversation_count, 0) || 1;
+                          const carsList = lead.interested_cars && lead.interested_cars.length > 0 ? lead.interested_cars : [lead.preferred_vehicle];
+                          const featsList = lead.interested_features && lead.interested_features.length > 0 ? lead.interested_features : ["SUV Styling & Road Presence", "Cabin Comfort"];
+                          const budgetVal = lead.budget_range || "₹15.00 Lakh – ₹22.50 Lakh";
+
                           return (
                             <div
                               key={idx}
                               onClick={() => handleSelectLead(lead)}
                               className={`p-3 rounded-2xl border cursor-pointer transition-all ${
                                 isSelected
-                                  ? "bg-red-50 border-red-500 shadow-sm ring-1 ring-red-500/40"
+                                  ? "bg-red-50/90 border-red-500 shadow-sm ring-1 ring-red-500/40"
                                   : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs"
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-slate-900 text-xs">{lead.name}</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${lead.booking_status === "TestRide_Completed" ? "bg-purple-100 text-purple-900 border border-purple-300" : "bg-emerald-100 text-emerald-800 border border-emerald-300"}`}>
-                                  {lead.booking_status}
-                                </span>
-                              </div>
-
-                              <p className="text-slate-500 text-[10px] mt-1 flex items-center gap-1">
-                                <Phone className="w-2.5 h-2.5 text-red-600" />
-                                <span>{lead.phone}</span>
-                                {lead.city && <span>• 📍 {lead.city}</span>}
-                              </p>
-
-                              {/* Booked Vehicle & Variant */}
-                              <div className="mt-2 p-1.5 bg-slate-50 rounded-lg border border-slate-200 space-y-0.5">
-                                <div className="text-slate-900 font-bold text-[10.5px] flex items-center gap-1">
-                                  <Car className="w-3 h-3 text-red-600 shrink-0" />
-                                  <span className="truncate">{lead.preferred_vehicle}</span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span className="font-black text-slate-900 text-xs block truncate">{lead.name}</span>
+                                  <p className="text-slate-600 text-[10px] mt-0.5 flex items-center gap-1 font-mono">
+                                    <Phone className="w-2.5 h-2.5 text-red-600 shrink-0" />
+                                    <span>{lead.phone}</span>
+                                    {lead.city && <span className="font-sans text-slate-500">• 📍 {lead.city}</span>}
+                                  </p>
                                 </div>
-                                <div className="flex items-center justify-between text-[9.5px] text-slate-500">
-                                  <span>{lead.scheduled_slot}</span>
-                                  {lead.booking_reference && (
-                                    <span className="font-mono text-cyan-800 bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200 font-bold">
-                                      {lead.booking_reference}
-                                    </span>
-                                  )}
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-900 border border-indigo-300">
+                                    💬 {convCount} {convCount === 1 ? "Conversation" : "Conversations"}
+                                  </span>
+                                  <span className={`text-[8.5px] px-1.5 py-0.2 rounded-full font-bold ${lead.booking_status === "TestRide_Completed" ? "bg-purple-100 text-purple-900 border border-purple-300" : "bg-emerald-100 text-emerald-800 border border-emerald-300"}`}>
+                                    {lead.booking_status}
+                                  </span>
                                 </div>
                               </div>
 
-                              {lead.booking_type === "HOME_DOORSTEP" && lead.delivery_address && (
-                                <div className="mt-1 text-[9.5px] text-emerald-700 truncate font-medium">
-                                  🏠 Doorstep: {lead.delivery_address}
+                              {/* Key Pre-Sales Intelligence: Car Interested, Features Interested, Budget */}
+                              <div className="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                                <div className="flex items-start justify-between gap-2 text-[10px]">
+                                  <span className="text-slate-500 font-bold shrink-0">🚗 Car Interested:</span>
+                                  <span className="font-black text-slate-900 text-right">{carsList.join(", ")}</span>
                                 </div>
-                              )}
+                                <div className="flex items-start justify-between gap-2 text-[10px]">
+                                  <span className="text-slate-500 font-bold shrink-0">💰 Budget:</span>
+                                  <span className="font-black text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    {budgetVal}
+                                  </span>
+                                </div>
+                                <div className="pt-1 border-t border-slate-200/80">
+                                  <span className="text-[9.5px] text-slate-500 font-bold block mb-1">✨ Interested Features:</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {featsList.slice(0, 4).map((f, fIdx) => (
+                                      <span
+                                        key={fIdx}
+                                        className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 font-semibold"
+                                      >
+                                        {f}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
 
-                              {lead.is_custom_checklist && (
-                                <div className="mt-1.5 flex items-center gap-1 text-[9px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                  <Sparkles className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                                  <span className="truncate">AI Pre-Sales Checklist ({lead.advisor_checklist?.length || 0} asks)</span>
+                              {/* Day-wise Conversation Breakdown Summary */}
+                              {lead.conversations_by_day && lead.conversations_by_day.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  <span className="text-[9px] uppercase tracking-wider font-black text-slate-500 block">
+                                    📅 Conversations Per Day ({lead.conversations_by_day.length} {lead.conversations_by_day.length === 1 ? "Day" : "Days"}):
+                                  </span>
+                                  {lead.conversations_by_day.map((dayGrp, dIdx) => (
+                                    <div
+                                      key={dIdx}
+                                      className="flex items-center justify-between text-[9.5px] bg-indigo-50/70 text-indigo-950 px-2 py-1 rounded-lg border border-indigo-200/80"
+                                    >
+                                      <span className="font-bold">📆 {dayGrp.date_label}</span>
+                                      <span className="font-black text-indigo-700">
+                                        {dayGrp.conversation_count} {dayGrp.conversation_count === 1 ? "Conv" : "Convs"} • {dayGrp.cars_discussed.join(", ")}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -518,39 +548,149 @@ export function SalesMobileApp({
                           className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all hover:scale-102"
                         >
                           <Mic className="w-3.5 h-3.5" />
-                          <span>Start Test Ride for {selectedLead.name}</span>
+                          <span>View Day-Wise Conversations &amp; Start Test Ride ({selectedLead.name})</span>
                         </button>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* TAB 2: Mobile Audio Recording (Light Theme) */}
+                {/* TAB 2: Customer Day-Wise Conversations + Mobile Audio Recording */}
                 {activeTab === "record" && (
                   <div className="space-y-3">
-                    {/* Customer & Booked Vehicle Header */}
-                    <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Customer</span>
-                        <span className="font-bold text-slate-900">{selectedLead?.name || "Valued Customer"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Phone</span>
-                        <span className="font-mono text-slate-700 text-[11px]">{selectedLead?.phone || "—"}</span>
-                      </div>
-                      <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Test Ride Vehicle</span>
-                        <span className="font-black text-slate-900 text-[11px]">
-                          {currentVehicleObj?.name}
+                    {/* Customer Identity (Name + Phone) & Key Intelligence Card */}
+                    <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div>
+                          <span className="text-[9.5px] text-slate-400 uppercase font-bold block">Unique Customer (Name + Phone)</span>
+                          <span className="font-black text-slate-900 text-sm">{selectedLead?.name || "Valued Customer"}</span>
+                          <span className="font-mono text-slate-600 text-[11px] block">{selectedLead?.phone || "—"}</span>
+                        </div>
+                        <span className="text-[10px] px-2.5 py-1 rounded-full font-black bg-indigo-100 text-indigo-900 border border-indigo-300">
+                          💬 {selectedLead?.total_conversations || 1} {(selectedLead?.total_conversations || 1) === 1 ? "Conversation" : "Conversations"}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[10.5px]">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Booked Variant</span>
-                        <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 font-bold">
-                          {selectedVariant}
+
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <div className="p-2 rounded-xl bg-red-50/70 border border-red-200">
+                          <span className="text-[9px] uppercase font-bold text-red-800 block">🚗 Interested Car(s)</span>
+                          <span className="font-black text-slate-900 text-[11px]">
+                            {selectedLead?.interested_cars && selectedLead.interested_cars.length > 0
+                              ? selectedLead.interested_cars.join(", ")
+                              : currentVehicleObj?.name}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                          <span className="text-[9px] uppercase font-bold text-emerald-800 block">💰 Customer Budget</span>
+                          <span className="font-black text-emerald-950 text-[11px]">
+                            {selectedLead?.budget_range || "₹15.00 Lakh – ₹22.50 Lakh"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[9.5px] uppercase font-bold text-slate-500 block mb-1">
+                          ✨ Features Customer Is Interested In:
                         </span>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedLead?.interested_features && selectedLead.interested_features.length > 0
+                            ? selectedLead.interested_features
+                            : ["SUV Styling & Road Presence", "Cabin Comfort & Infotainment"]
+                          ).map((feat, i) => (
+                            <span
+                              key={i}
+                              className="text-[9.5px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 font-bold"
+                            >
+                              {feat}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Per-Day Conversation History Timeline for Sales Consultant */}
+                    {selectedLead?.conversations_by_day && selectedLead.conversations_by_day.length > 0 && (
+                      <div className="p-3 bg-white rounded-2xl border border-indigo-200 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1">
+                            📅 Conversations Per Day ({selectedLead.name})
+                          </span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
+                            {selectedLead.conversations_by_day.length} {selectedLead.conversations_by_day.length === 1 ? "Active Day" : "Active Days"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {selectedLead.conversations_by_day.map((dayGroup, dIdx) => (
+                            <div key={dIdx} className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+                              {/* Day Header */}
+                              <div className="px-2.5 py-1.5 bg-indigo-950 text-white flex items-center justify-between text-[10px]">
+                                <span className="font-black">📆 {dayGroup.date_label}</span>
+                                <span className="px-1.5 py-0.2 rounded bg-indigo-800 text-indigo-100 font-bold text-[9px]">
+                                  {dayGroup.conversation_count} {dayGroup.conversation_count === 1 ? "Conversation" : "Conversations"}
+                                </span>
+                              </div>
+
+                              {/* Sessions within this Day */}
+                              <div className="p-2 space-y-2">
+                                {dayGroup.sessions.map((sess, sIdx) => {
+                                  const isExpanded = expandedSessionId === sess.session_id;
+                                  return (
+                                    <div key={sIdx} className="p-2 rounded-lg bg-white border border-slate-200 shadow-2xs space-y-1">
+                                      <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-black text-slate-900">
+                                          Conversation #{dayGroup.sessions.length - sIdx} • {sess.time_label}
+                                        </span>
+                                        <span className="font-mono text-[8.5px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                          {sess.session_id}
+                                        </span>
+                                      </div>
+                                      <div className="text-[9.5px] text-slate-700 space-y-0.5">
+                                        <div>
+                                          <span className="font-bold text-slate-500">Car: </span>
+                                          <span className="font-bold text-slate-900">{sess.interested_car}</span>
+                                          <span className="mx-1.5 text-slate-300">|</span>
+                                          <span className="font-bold text-slate-500">Budget: </span>
+                                          <span className="font-bold text-emerald-800">{sess.budget}</span>
+                                        </div>
+                                        <div>
+                                          <span className="font-bold text-slate-500">Features: </span>
+                                          <span className="text-amber-900 font-semibold">{sess.interested_features.join(", ")}</span>
+                                        </div>
+                                      </div>
+
+                                      {sess.turns && sess.turns.length > 0 && (
+                                        <div className="pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedSessionId(isExpanded ? null : sess.session_id)}
+                                            className="text-[9.5px] font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                                          >
+                                            {isExpanded ? "Hide Conversation Transcript ▲" : `View Full Transcript (${sess.turn_count} turns) ▼`}
+                                          </button>
+                                          {isExpanded && (
+                                            <div className="mt-1.5 max-h-44 overflow-y-auto space-y-1 p-2 rounded-lg bg-slate-900 text-slate-100 text-[9.5px]">
+                                              {sess.turns.map((t, tIdx) => (
+                                                <div key={tIdx} className="leading-snug">
+                                                  <span className={t.role === "customer" ? "text-emerald-400 font-bold" : "text-amber-300 font-bold"}>
+                                                    {t.speaker}:{" "}
+                                                  </span>
+                                                  <span className="text-slate-200">{t.message}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Advisor Demo Checklist (Light Theme) */}
                     {(() => {

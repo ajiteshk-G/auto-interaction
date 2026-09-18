@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { LiveAudioOutputManager, LiveVideoOutputManager } from "@/lib/audioManager";
+import { LiveAudioOutputManager } from "@/lib/audioManager";
 import { saveFullSessionTranscript } from "@/lib/api";
 
 export interface LiveMessage {
@@ -24,7 +24,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [rmsLevel, setRmsLevel] = useState(0);
   const [messages, setMessages] = useState<LiveMessage[]>([]);
-  const [activeLanguage, setActiveLanguage] = useState("Hinglish");
+  const [activeLanguage, setActiveLanguage] = useState("en-IN");
 
   const socketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -35,9 +35,21 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   const sessionIdRef = useRef<string>(`SESS-${Date.now()}`);
   const customerInfoRef = useRef<{ name?: string; phone?: string; customer_id?: string; vehicle_id?: string }>({});
   const audioOutputManagerRef = useRef<LiveAudioOutputManager | null>(null);
-  const videoOutputManagerRef = useRef<LiveVideoOutputManager | null>(null);
   const isAssistantSpeakingRef = useRef(false);
   const hasGreetedRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const isRecordingRef = useRef(false);
+  const messagesRef = useRef<LiveMessage[]>([]);
+  const stopVoiceRecordingRef = useRef<() => void>(() => {});
+  const lastTurnWasBookingRef = useRef(false);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     const audioMgr = new LiveAudioOutputManager();
@@ -51,11 +63,28 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       }
     };
     audioOutputManagerRef.current = audioMgr;
-    videoOutputManagerRef.current = new LiveVideoOutputManager();
 
     return () => {
       audioMgr.interrupt();
     };
+  }, []);
+
+  const scheduleAutoEndCall = useCallback(() => {
+    (async () => {
+      // Wait for initial audio chunk to start playing
+      await new Promise((r) => setTimeout(r, 600));
+      // Wait while Kavya finishes speaking her goodbye (up to 8 seconds)
+      for (let i = 0; i < 40; i++) {
+        if (!isAssistantSpeakingRef.current) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await new Promise((r) => setTimeout(r, 400));
+      if (isRecordingRef.current) {
+        stopVoiceRecordingRef.current();
+      }
+    })();
   }, []);
 
   const playAudioGreeting = useCallback(async (customGreeting?: string, customerName?: string) => {
@@ -85,28 +114,44 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
   const getWebSocketUrl = () => {
     if (typeof window === "undefined") return null;
+    const params = new URLSearchParams();
+    if (customerInfoRef.current.customer_id) {
+      params.set("customer_id", customerInfoRef.current.customer_id);
+    }
+    if (customerInfoRef.current.name) {
+      params.set("customer_name", customerInfoRef.current.name);
+    }
+    if (customerInfoRef.current.phone) {
+      params.set("customer_phone", customerInfoRef.current.phone);
+    }
+    if (sessionIdRef.current) {
+      params.set("session_id", sessionIdRef.current);
+    }
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
     if (process.env.NEXT_PUBLIC_WS_URL) {
-      return process.env.NEXT_PUBLIC_WS_URL;
+      return `${process.env.NEXT_PUBLIC_WS_URL}${qs}`;
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const hostname = window.location.hostname;
-    const port = window.location.port;
 
-    // Route to backend port 8000 when frontend runs on port 3000 in dev / cloudtop
-    if (port === "3000" || hostname === "localhost" || hostname === "127.0.0.1") {
-      return `${protocol}//${hostname}:8000/ws/live-audio`;
+    // Route directly to backend port 8000 only when accessed via localhost / 127.0.0.1;
+    // on Cloudtop proxy domains (*.googlers.com) and Cloud Run, use window.location.host
+    // so Next.js rewrites / Cloud Run route /ws/live-audio on the same port.
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}:8000/ws/live-audio${qs}`;
     }
 
-    // On Cloud Run container deployment, connect to the same host
-    return `${protocol}//${window.location.host}/ws/live-audio`;
+    return `${protocol}//${window.location.host}/ws/live-audio${qs}`;
   };
 
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback((forceReconnect?: boolean) => {
     if (socketRef.current) {
       if (
-        socketRef.current.readyState === WebSocket.CONNECTING ||
-        socketRef.current.readyState === WebSocket.OPEN
+        !forceReconnect &&
+        (socketRef.current.readyState === WebSocket.CONNECTING ||
+          socketRef.current.readyState === WebSocket.OPEN)
       ) {
         return;
       }
@@ -136,37 +181,71 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         try {
           const payload = JSON.parse(event.data);
 
-          if (payload.type === "VIDEO_CHUNK" && payload.video_b64) {
-            videoOutputManagerRef.current?.playVideoChunk(payload.video_b64);
-          } else if (payload.type === "AUDIO_CHUNK" && payload.audio_b64) {
+          if (payload.type === "AUDIO_CHUNK" && payload.audio_b64) {
             audioOutputManagerRef.current?.playAudioChunk(payload.audio_b64);
             setRmsLevel(0.35 + Math.random() * 0.45);
+          } else if (payload.type === "TURN_COMPLETE") {
+            awaitingGreetingRef.current = false;
+          } else if (payload.type === "CALL_ENDED") {
+            awaitingGreetingRef.current = false;
+            if (!lastTurnWasBookingRef.current) {
+              scheduleAutoEndCall();
+            } else {
+              lastTurnWasBookingRef.current = false;
+            }
           } else if (payload.type === "INTERRUPTED") {
+            awaitingGreetingRef.current = false;
             audioOutputManagerRef.current?.interrupt();
             setRmsLevel(0);
           } else if (payload.type === "SESSION_INIT" || payload.type === "SESSION_INITIALIZED") {
             if (payload.session_id) sessionIdRef.current = payload.session_id;
-          } else if (payload.type === "USER_TRANSCRIPTION" && payload.message) {
-            if (onUiEventRef.current) {
-              onUiEventRef.current({ type: "USER_SPEECH_TEXT", text: payload.message });
+          } else if (payload.type === "USER_TRANSCRIPTION" && (payload.turn_text || payload.message)) {
+            const cleanText = (payload.turn_text || payload.message || "").trim();
+            if (!cleanText) return;
+            lastTurnWasBookingRef.current = false;
+            if (payload.language) {
+              setActiveLanguage(payload.language);
             }
+
             setMessages((prev) => {
+              const turnId = payload.turn_id;
+              if (turnId) {
+                const existingIdx = prev.findIndex((m) => m.id === turnId);
+                if (existingIdx !== -1) {
+                  const updated = [...prev];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    text: cleanText
+                  };
+                  return updated;
+                }
+                // Insert user turn BEFORE any active assistant turn that started in parallel
+                return [
+                  ...prev,
+                  {
+                    id: turnId,
+                    speaker: "customer",
+                    text: cleanText,
+                    timestamp: new Date().toLocaleTimeString()
+                  }
+                ];
+              }
+
               if (prev.length > 0) {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg.speaker === "customer") {
                   let newText = "";
-                  if (payload.message.startsWith(lastMsg.text)) {
-                    newText = payload.message;
-                  } else if (lastMsg.text.startsWith(payload.message)) {
+                  if (cleanText.startsWith(lastMsg.text)) {
+                    newText = cleanText;
+                  } else if (lastMsg.text.startsWith(cleanText)) {
                     newText = lastMsg.text;
                   } else {
-                    const sep = (lastMsg.text.endsWith(" ") || payload.message.startsWith(" ")) ? "" : " ";
-                    newText = lastMsg.text + sep + payload.message;
+                    newText = `${lastMsg.text} ${cleanText}`.trim();
                   }
                   const updated = [...prev];
                   updated[updated.length - 1] = {
                     ...lastMsg,
-                    text: newText.trim()
+                    text: newText
                   };
                   return updated;
                 }
@@ -176,36 +255,72 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
                 {
                   id: (Date.now() + Math.random()).toString(),
                   speaker: "customer",
-                  text: payload.message.trim(),
+                  text: cleanText,
                   timestamp: new Date().toLocaleTimeString()
                 }
               ];
             });
-          } else if (payload.type === "ASSISTANT_RESPONSE" && payload.message) {
+
+            if (onUiEventRef.current) {
+              try {
+                onUiEventRef.current({ type: "USER_SPEECH_TEXT", text: cleanText });
+              } catch (err) {
+                console.debug("onUiEvent USER_SPEECH_TEXT notice:", err);
+              }
+            }
+          } else if (payload.type === "ASSISTANT_RESPONSE" && (payload.turn_text || payload.message)) {
+            const cleanText = (payload.turn_text || payload.message || "").trim();
+            if (!cleanText) return;
+
             const detectedLang = payload.language || activeLanguageRef.current;
             if (payload.language) {
               setActiveLanguage(payload.language);
             }
             setMessages((prev) => {
+              const turnId = payload.turn_id;
+              if (turnId) {
+                const existingIdx = prev.findIndex((m) => m.id === turnId);
+                if (existingIdx !== -1) {
+                  const updated = [...prev];
+                  updated[existingIdx] = {
+                    ...updated[existingIdx],
+                    text: cleanText,
+                    toolCall: payload.tool_call || updated[existingIdx].toolCall,
+                    language: detectedLang
+                  };
+                  return updated;
+                }
+                return [
+                  ...prev,
+                  {
+                    id: turnId,
+                    speaker: "mia",
+                    text: cleanText,
+                    timestamp: new Date().toLocaleTimeString(),
+                    toolCall: payload.tool_call,
+                    language: detectedLang
+                  }
+                ];
+              }
+
               if (prev.length > 0) {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg.speaker === "mia") {
                   let newText = "";
-                  if (payload.message.startsWith(lastMsg.text)) {
-                    newText = payload.message;
-                  } else if (lastMsg.text.startsWith(payload.message)) {
+                  if (cleanText.startsWith(lastMsg.text)) {
+                    newText = cleanText;
+                  } else if (lastMsg.text.startsWith(cleanText)) {
                     newText = lastMsg.text;
-                  } else if (payload.is_delta || payload.message.length < 40) {
-                    const sep = (lastMsg.text.endsWith(" ") || payload.message.startsWith(" ")) ? "" : " ";
-                    newText = lastMsg.text + sep + payload.message;
+                  } else if (payload.is_delta || cleanText.length < 40) {
+                    newText = `${lastMsg.text} ${cleanText}`.trim();
                   } else {
-                    newText = payload.message;
+                    newText = cleanText;
                   }
 
                   const updated = [...prev];
                   updated[updated.length - 1] = {
                     ...lastMsg,
-                    text: newText.trim(),
+                    text: newText,
                     toolCall: payload.tool_call || lastMsg.toolCall,
                     language: detectedLang
                   };
@@ -217,7 +332,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
                 {
                   id: (Date.now() + Math.random()).toString(),
                   speaker: "mia",
-                  text: payload.message.trim(),
+                  text: cleanText,
                   timestamp: new Date().toLocaleTimeString(),
                   toolCall: payload.tool_call,
                   language: detectedLang
@@ -230,7 +345,26 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
               window.speechSynthesis.cancel();
             }
 
-            const words = (payload.message || "").split(/\s+/).length;
+            // Client-side safety net: if assistant speaks a clear closing farewell (and not during a test-drive booking or asking a question), auto-end call after playback finishes
+            const lowClean = cleanText.toLowerCase();
+            const isClosingFarewell =
+              !lastTurnWasBookingRef.current &&
+              !cleanText.includes("?") &&
+              (lowClean.includes("have a nice day") ||
+                lowClean.includes("have a great day") ||
+                lowClean.includes("have a wonderful day") ||
+                lowClean.includes("have a good day") ||
+                lowClean.includes("आपका दिन शुभ हो") ||
+                lowClean.includes("फिर मिलते हैं") ||
+                lowClean.includes("आने के लिए धन्यवाद") ||
+                lowClean.includes("phir milte hain") ||
+                lowClean.includes("aapka din shubh ho") ||
+                lowClean.includes("goodbye"));
+            if (isClosingFarewell) {
+              scheduleAutoEndCall();
+            }
+
+            const words = cleanText.split(/\s+/).length;
             const durationMs = Math.min(8000, Math.max(2500, words * 170));
             const startT = performance.now();
             const animLip = () => {
@@ -244,8 +378,19 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
             };
             animLip();
           } else if (payload.type === "UI_ACTION") {
+            if (payload.tool_name === "open_test_drive_booking" || payload.tool_name === "book_test_drive") {
+              lastTurnWasBookingRef.current = true;
+            } else if (payload.tool_name === "end_call") {
+              if (!lastTurnWasBookingRef.current) {
+                scheduleAutoEndCall();
+              }
+            }
             if (onUiEventRef.current) {
-              onUiEventRef.current(payload);
+              try {
+                onUiEventRef.current(payload);
+              } catch (err) {
+                console.debug("onUiEvent UI_ACTION notice:", err);
+              }
             }
           } else if (payload.type === "AUDIO_ENERGY") {
             setRmsLevel(payload.rms * 2.5);
@@ -270,7 +415,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   }, []);
 
   useEffect(() => {
-    connectWebSocket();
+    setIsConnected(true);
     return () => {
       if (socketRef.current) {
         socketRef.current.onmessage = null;
@@ -283,10 +428,17 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         audioOutputManagerRef.current.interrupt();
       }
     };
-  }, [connectWebSocket]);
+  }, []);
 
   const sendTextMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    const low = text.toLowerCase();
+    if (low.includes("successfully booked") || low.includes("reference:") || (low.includes("test drive") && low.includes("book"))) {
+      lastTurnWasBookingRef.current = true;
+    } else {
+      lastTurnWasBookingRef.current = false;
+    }
 
     if (audioOutputManagerRef.current) {
       await audioOutputManagerRef.current.initializeAudioContext();
@@ -370,18 +522,109 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
     }
   };
 
+  const awaitingGreetingRef = useRef<boolean>(false);
+
+  const sendPcmAsJson = (pcmBuffer: ArrayBuffer) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
+    const uint8 = new Uint8Array(pcmBuffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, Array.from(uint8.subarray(i, i + chunkSize)));
+    }
+    const base64Chunk = window.btoa(binary);
+    socketRef.current.send(
+      JSON.stringify({
+        realtimeInput: {
+          mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Chunk }]
+        }
+      })
+    );
+  };
+
   const startVoiceRecording = async (customerName?: string, customerPhone?: string, vehicleId?: string) => {
+    if (isStartingRef.current || isRecordingRef.current) {
+      return;
+    }
+    isStartingRef.current = true;
+    try {
+      await startVoiceRecordingInner(customerName, customerPhone, vehicleId);
+    } finally {
+      isStartingRef.current = false;
+    }
+  };
+
+  const startVoiceRecordingInner = async (customerName?: string, customerPhone?: string, vehicleId?: string) => {
     // Resume / initialize audio output context on user gesture
     if (audioOutputManagerRef.current) {
       await audioOutputManagerRef.current.initializeAudioContext();
     }
-    if (customerName || customerPhone || vehicleId) {
-      customerInfoRef.current = {
-        name: customerName || customerInfoRef.current.name,
-        phone: customerPhone || customerInfoRef.current.phone,
-        vehicle_id: vehicleId || customerInfoRef.current.vehicle_id || "thar_roxx"
-      };
+    const resolvedName = (customerName || customerInfoRef.current.name || "").trim();
+    const resolvedPhone = (customerPhone || customerInfoRef.current.phone || "").trim();
+    const resolvedVehicle = vehicleId || customerInfoRef.current.vehicle_id || "thar_roxx";
+
+    // Generate a fresh unique session_id for each new conversation so multiple conversations are tracked separately
+    const freshSessionId =
+      "SESS-" +
+      new Date().toISOString().slice(0, 10).replace(/-/g, "") +
+      "-" +
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+    sessionIdRef.current = freshSessionId;
+    hasGreetedRef.current = false;
+    setMessages([]);
+    messagesRef.current = [];
+
+    if (resolvedName && resolvedPhone) {
+      try {
+        const res = await fetch("/api/customer/identify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: resolvedName,
+            phone: resolvedPhone,
+            session_type: "LIVE_CALL",
+            vehicle_id: resolvedVehicle
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.session_id) {
+            sessionIdRef.current = data.session_id;
+          }
+          customerInfoRef.current = {
+            customer_id: data.customer_id || customerInfoRef.current.customer_id,
+            name: data.name || resolvedName,
+            phone: data.phone || resolvedPhone,
+            vehicle_id: resolvedVehicle
+          };
+        } else {
+          customerInfoRef.current = {
+            ...customerInfoRef.current,
+            name: resolvedName,
+            phone: resolvedPhone,
+            vehicle_id: resolvedVehicle
+          };
+        }
+      } catch (e) {
+        customerInfoRef.current = {
+          ...customerInfoRef.current,
+          name: resolvedName,
+          phone: resolvedPhone,
+          vehicle_id: resolvedVehicle
+        };
+      }
     }
+
+    // Always open a fresh WebSocket bound to this customer (Name + Phone) and this conversation's session_id
+    connectWebSocket(true);
+    for (let i = 0; i < 40; i++) {
+      const ws = socketRef.current as WebSocket | null;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -411,6 +654,10 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           const { pcm16, rms } = e.data;
           // Only send mic packets when WebSocket is open
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            // Protect initial greeting generation from room noise triggering premature VAD cancellation
+            if (awaitingGreetingRef.current && rms < 0.08) {
+              return;
+            }
             // Echo cancellation gate: when assistant is speaking through speakers,
             // ignore low acoustic mic feedback to prevent Gemini Live from responding to itself
             if (isAssistantSpeakingRef.current && rms < 0.10) {
@@ -420,7 +667,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
               // Deliberate user barge-in: silence assistant immediately
               audioOutputManagerRef.current?.interrupt();
             }
-            socketRef.current.send(pcm16);
+            sendPcmAsJson(pcm16);
           }
         };
 
@@ -443,13 +690,16 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
           const rms = Math.sqrt(sum / inputData.length);
 
           if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            if (awaitingGreetingRef.current && rms < 0.08) {
+              return;
+            }
             if (isAssistantSpeakingRef.current && rms < 0.10) {
               return;
             }
             if (isAssistantSpeakingRef.current && rms >= 0.10) {
               audioOutputManagerRef.current?.interrupt();
             }
-            socketRef.current.send(pcm16.buffer);
+            sendPcmAsJson(pcm16.buffer);
           }
         };
 
@@ -457,55 +707,23 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         // Note: Do NOT connect to audioCtx.destination to prevent microphone feedback loop
       }
 
-// Native audio streaming only - No TTS / STT
-
       // Trigger dynamic greeting from Kavya on starting live session if no messages yet and not greeted yet
-      if (messages.length === 0 && !hasGreetedRef.current) {
+      if (!hasGreetedRef.current) {
         hasGreetedRef.current = true;
-        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-          socketRef.current.send(
+        const activeWs = socketRef.current as WebSocket | null;
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+          awaitingGreetingRef.current = true;
+          setTimeout(() => {
+            awaitingGreetingRef.current = false;
+          }, 3000);
+          activeWs.send(
             JSON.stringify({
               type: "START_SESSION",
-              customer_name: customerName || "there",
+              customer_name: customerName || customerInfoRef.current.name || "there",
+              customer_phone: customerPhone || customerInfoRef.current.phone,
               language: activeLanguageRef.current
             })
           );
-        } else {
-          // If WebSocket is not ready, fetch dynamic greeting via REST immediately
-          (async () => {
-            try {
-              const res = await fetch("/api/live/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  message: `Please give a warm, dynamic, non-static spoken greeting to ${customerName || "there"} as Kavya, introducing yourself as the brand's AI Showroom Specialist.`,
-                  session_id: sessionIdRef.current,
-                  language: activeLanguageRef.current
-                })
-              });
-              if (res.ok) {
-                const data = await res.json();
-                const detectedLang = data.language || activeLanguageRef.current;
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now().toString(),
-                    speaker: "mia",
-                    text: data.message,
-                    timestamp: new Date().toLocaleTimeString(),
-                    toolCall: data.tool_call,
-                    language: detectedLang
-                  }
-                ]);
-
-                if (typeof window !== "undefined" && "speechSynthesis" in window) {
-                  window.speechSynthesis.cancel();
-                }
-              }
-            } catch (err) {
-              console.debug("Initial greeting REST notice:", err);
-            }
-          })();
         }
       }
 
@@ -557,19 +775,12 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         window.speechSynthesis.cancel();
       } catch (e) {}
     }
-    const video = typeof document !== "undefined" ? (document.getElementById("video_player") as HTMLVideoElement | null) : null;
-    if (video) {
-      try {
-        video.pause();
-        video.currentTime = 0;
-      } catch (e) {}
-    }
     setIsRecording(false);
     setRmsLevel(0);
     hasGreetedRef.current = false;
 
     // Flush and persist the entire conversation session transcript to SQLite database
-    const currentMsgs = [...messages];
+    const currentMsgs = [...messagesRef.current];
     if (currentMsgs.length > 0) {
       saveFullSessionTranscript({
         session_id: sessionIdRef.current,
@@ -592,6 +803,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
       }
     ]);
   };
+  stopVoiceRecordingRef.current = stopVoiceRecording;
 
   const switchLanguage = (lang: string) => {
     setActiveLanguage(lang);

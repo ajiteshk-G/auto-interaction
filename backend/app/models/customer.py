@@ -9,7 +9,7 @@ def utc_now():
 class Customer(Base):
     __tablename__ = "customers"
     __table_args__ = (
-        UniqueConstraint("phone", "brand_id", name="uq_customers_phone_brand"),
+        UniqueConstraint("name", "phone", "brand_id", name="uq_customers_name_phone_brand"),
     )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)

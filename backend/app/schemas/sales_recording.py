@@ -49,6 +49,34 @@ class TestRideInsightResponse(BaseModel):
     status: str
     created_at: datetime
 
+class ConversationTurnItem(BaseModel):
+    speaker: str
+    role: str
+    message: str
+    timestamp: Optional[str] = ""
+
+class ConversationSessionSummary(BaseModel):
+    session_id: str
+    date_key: str
+    date_label: str
+    time_label: str
+    channel: str = "LIVE_VOICE"
+    interested_car: str
+    interested_features: List[str] = []
+    budget: str
+    key_points_summary: str
+    turn_count: int = 0
+    turns: List[ConversationTurnItem] = []
+
+class DailyConversationGroup(BaseModel):
+    date_key: str
+    date_label: str
+    conversation_count: int
+    cars_discussed: List[str] = []
+    features_interested: List[str] = []
+    budget_mentioned: str
+    sessions: List[ConversationSessionSummary] = []
+
 class TestRideLeadItem(BaseModel):
     customer_id: str
     brand_id: Optional[str] = "mahindra"
@@ -70,3 +98,8 @@ class TestRideLeadItem(BaseModel):
     presales_notes: Optional[str] = None
     advisor_checklist: Optional[List[str]] = None
     is_custom_checklist: Optional[bool] = False
+    total_conversations: int = 0
+    interested_cars: List[str] = []
+    interested_features: List[str] = []
+    budget_range: Optional[str] = None
+    conversations_by_day: List[DailyConversationGroup] = []

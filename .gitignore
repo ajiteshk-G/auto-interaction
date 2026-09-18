@@ -30,6 +30,7 @@ htmlcov/
 
 # Local Databases & Logs
 *.db
+!backend/data/auto.db
 *.sqlite
 *.sqlite3
 *.log

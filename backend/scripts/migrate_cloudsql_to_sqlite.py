@@ -14,7 +14,7 @@ from app.models import (
     Dealership, TestRideRecording, OutboundCallLog, InsuranceClaim
 )
 
-CLOUD_SQL_URL = "postgresql+asyncpg://postgres:MahindraDev2026!Secure@34.42.54.228:5432/mahindra_auto"
+CLOUD_SQL_URL = os.getenv("CLOUD_SQL_URL", "")
 LOCAL_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "auto.db")
 LOCAL_SQLITE_URL = f"sqlite+aiosqlite:///{LOCAL_DB_PATH}"
 

@@ -1,3 +1,4 @@
+import os
 import pytest
 import io
 from fastapi.testclient import TestClient
@@ -5,6 +6,42 @@ from app.main import app
 from app.services.brand_service import BrandService
 
 client = TestClient(app)
+
+HYUNDAI_JSON_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data",
+    "brands",
+    "hyundai.json",
+)
+HYUNDAI_UPLOAD_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "static",
+    "uploads",
+    "hyundai",
+    "vehicles",
+)
+
+
+@pytest.fixture(autouse=True)
+def _restore_hyundai_catalog():
+    with open(HYUNDAI_JSON_PATH, "rb") as f:
+        original_bytes = f.read()
+    existing_uploads = set(os.listdir(HYUNDAI_UPLOAD_DIR)) if os.path.exists(HYUNDAI_UPLOAD_DIR) else set()
+    try:
+        yield
+    finally:
+        with open(HYUNDAI_JSON_PATH, "wb") as f:
+            f.write(original_bytes)
+        if os.path.exists(HYUNDAI_UPLOAD_DIR):
+            for fname in os.listdir(HYUNDAI_UPLOAD_DIR):
+                if fname not in existing_uploads:
+                    try:
+                        os.remove(os.path.join(HYUNDAI_UPLOAD_DIR, fname))
+                    except OSError:
+                        pass
+        BrandService._initialized = False
+        BrandService.initialize()
+
 
 def test_list_brands():
     response = client.get("/api/brands")

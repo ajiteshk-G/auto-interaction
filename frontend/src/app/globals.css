@@ -233,13 +233,6 @@ h1, h2, h3, h4, h5, h6 {
   transition: flex 0.3s ease;
 }
 
-#video_player {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
 .avatar-placeholder-overlay {
   position: absolute;
   top: 0;

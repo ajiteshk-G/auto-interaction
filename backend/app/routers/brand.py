@@ -91,6 +91,16 @@ async def onboard_brand(req: BrandOnboardRequest, db: AsyncSession = Depends(get
         logger.error(f"Failed to onboard brand {req.brand_name}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to onboard brand: {str(e)}")
 
+import re
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+def _sanitize_slug(raw: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9_-]", "", (raw or "").lower())
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Invalid identifier slug")
+    return cleaned
+
 @router.post("/{brand_id}/upload-vehicle-image", response_model=VehicleItem)
 async def upload_vehicle_image(
     brand_id: str,
@@ -101,7 +111,9 @@ async def upload_vehicle_image(
     Upload a replacement vehicle image directly. Marks the image as
     is_custom_source_of_truth = True, taking priority over any scraped image.
     """
-    brand = BrandService.get_brand(brand_id)
+    safe_brand_id = _sanitize_slug(brand_id)
+    safe_vehicle_id = _sanitize_slug(vehicle_id)
+    brand = BrandService.get_brand(safe_brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail=f"Brand '{brand_id}' not found")
 
@@ -109,21 +121,25 @@ async def upload_vehicle_image(
     if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
         ext = ".png"
 
-    dest_dir = os.path.join(STATIC_UPLOAD_DIR, brand_id.lower(), "vehicles")
+    content = await image.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded image exceeds 10 MB limit")
+
+    dest_dir = os.path.join(STATIC_UPLOAD_DIR, safe_brand_id, "vehicles")
     os.makedirs(dest_dir, exist_ok=True)
     
-    unique_name = f"{vehicle_id.lower()}_{int(time.time())}{ext}"
+    unique_name = f"{safe_vehicle_id}_{int(time.time())}{ext}"
     dest_path = os.path.join(dest_dir, unique_name)
 
     try:
         with open(dest_path, "wb") as f:
-            shutil.copyfileobj(image.file, f)
+            f.write(content)
     except Exception as e:
         logger.error(f"Failed saving uploaded vehicle image: {e}")
         raise HTTPException(status_code=500, detail="Failed to save image file")
 
-    public_url = f"/uploads/{brand_id.lower()}/vehicles/{unique_name}"
-    updated_v = BrandService.update_vehicle_image(brand_id, vehicle_id, public_url)
+    public_url = f"/uploads/{safe_brand_id}/vehicles/{unique_name}"
+    updated_v = BrandService.update_vehicle_image(safe_brand_id, safe_vehicle_id, public_url)
     if not updated_v:
         raise HTTPException(status_code=404, detail=f"Vehicle '{vehicle_id}' not found in brand '{brand_id}'")
 
@@ -175,15 +191,20 @@ async def upload_brand_logo(
     logo: UploadFile = File(...)
 ):
     """Upload custom brand logo, overriding scraped logo."""
-    brand = BrandService.get_brand(brand_id)
+    safe_brand_id = _sanitize_slug(brand_id)
+    brand = BrandService.get_brand(safe_brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail=f"Brand '{brand_id}' not found")
 
     ext = os.path.splitext(logo.filename or "")[1].lower()
-    if ext not in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
+    if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
         ext = ".png"
 
-    dest_dir = os.path.join(STATIC_UPLOAD_DIR, brand_id.lower(), "logos")
+    content = await logo.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded logo exceeds 10 MB limit")
+
+    dest_dir = os.path.join(STATIC_UPLOAD_DIR, safe_brand_id, "logos")
     os.makedirs(dest_dir, exist_ok=True)
 
     unique_name = f"logo_{int(time.time())}{ext}"
@@ -191,12 +212,12 @@ async def upload_brand_logo(
 
     try:
         with open(dest_path, "wb") as f:
-            shutil.copyfileobj(logo.file, f)
+            f.write(content)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to save logo file")
 
-    public_url = f"/uploads/{brand_id.lower()}/logos/{unique_name}"
-    updated = BrandService.update_brand_logo(brand_id, public_url)
+    public_url = f"/uploads/{safe_brand_id}/logos/{unique_name}"
+    updated = BrandService.update_brand_logo(safe_brand_id, public_url)
     return updated
 
 @router.put("/{brand_id}/vehicles/{vehicle_id}", response_model=VehicleItem)

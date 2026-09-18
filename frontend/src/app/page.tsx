@@ -79,13 +79,16 @@ export default function Home() {
     for (const v of sortedVehicles) {
       const tokens = v.name
         .toLowerCase()
-        .split(/[\s-_]+/)
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
         .filter((t) => t.length >= 3 && !["suv", "car", "all", "new", "the", "and", "edition", "door"].includes(t));
       for (const token of tokens) {
-        const regex = new RegExp(`\\b${token}\\b`, "i");
-        if (regex.test(clean)) {
-          return v;
-        }
+        try {
+          const regex = new RegExp(`\\b${token}\\b`, "i");
+          if (regex.test(clean)) {
+            return v;
+          }
+        } catch (e) {}
       }
     }
 

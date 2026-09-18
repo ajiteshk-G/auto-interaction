@@ -8,13 +8,24 @@ PYTHONUNBUFFERED=1 PYTHONPATH=/app/backend python3 -m uvicorn app.main:app --hos
 BACKEND_PID=$!
 
 echo "Waiting for backend to become healthy on port 8000..."
-for i in {1..20}; do
-  if curl -s http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
-    echo "Backend is healthy!"
+BACKEND_READY=0
+for i in {1..180}; do
+  if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    echo "ERROR: Backend process exited prematurely!"
+    exit 1
+  fi
+  if curl -sf http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
+    echo "Backend is healthy after $((i / 2))s!"
+    BACKEND_READY=1
     break
   fi
   sleep 0.5
 done
+
+if [ "$BACKEND_READY" -ne 1 ]; then
+  echo "ERROR: Backend did not become healthy within 90 seconds."
+  exit 1
+fi
 
 echo "Starting Next.js Frontend on 0.0.0.0:${PORT}..."
 if [ -f /app/frontend/server.js ]; then

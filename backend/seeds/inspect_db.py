@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.models.customer import Customer, ConversationSession, InteractionLog
 from app.models.booking import TestDriveBooking
 
-DATABASE_URL = "postgresql+asyncpg://postgres:MahindraDev2026!Secure@34.42.54.228:5432/mahindra_auto"
+from app.database import db_url as DATABASE_URL
 
 async def check():
     engine = create_async_engine(DATABASE_URL)

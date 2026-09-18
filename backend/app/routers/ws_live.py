@@ -174,17 +174,41 @@ async def live_audio_websocket(websocket: WebSocket):
     query_params = dict(websocket.query_params)
     is_outbound = query_params.get("mode") == "outbound_call" or query_params.get("role") == "outbound_feedback"
     lead_ref = query_params.get("lead_ref") or "BK-MAH-23382"
-    cust_name = query_params.get("customer_name") or "Kunal Mathuria"
+    cust_name = query_params.get("customer_name") or "Valued Guest"
+    cust_phone = query_params.get("customer_phone") or query_params.get("phone") or ""
     veh_name = query_params.get("vehicle_name") or "Mahindra XUV700 AX7L"
     advisor_name = query_params.get("advisor_name") or "Rajesh Varma"
     session_id = query_params.get("session_id") or f"CALL-MIA-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
-    customer_id = query_params.get("customer_id") or "CUST-9819657034"
+    customer_id = query_params.get("customer_id") or ""
 
-
+    customer = None
     async with AsyncSessionLocal() as db:
-        customer = await CustomerService.get_customer_by_id(db, customer_id)
-        if not customer:
-            customer = await CustomerService.get_or_create_default_customer(db)
+        if customer_id and customer_id not in ("CUST-9819657034", "CUST-9820155432", "GUEST-TRANSIENT"):
+            customer = await CustomerService.get_customer_by_id(db, customer_id)
+        if not customer and cust_phone and cust_phone.strip():
+            customer = await CustomerService.get_or_create_customer_by_phone(
+                db,
+                phone=cust_phone.strip(),
+                name=cust_name if cust_name != "Valued Guest" else None,
+                brand_id=query_params.get("brand_id")
+            )
+
+    if not customer:
+        from app.models.customer import Customer
+        customer = Customer(
+            id=0,
+            customer_id="GUEST-TRANSIENT",
+            brand_id=query_params.get("brand_id") or "mahindra",
+            name=cust_name,
+            phone=cust_phone,
+            city="Mumbai",
+            preferred_language="Hinglish",
+            current_phase="PRE_SALES",
+            interested_vehicle_id="thar_roxx",
+            interested_variant="AX7L Diesel AT 4x4",
+            budget_range="₹18 Lakh - ₹25 Lakh",
+            kyc_status="PENDING"
+        )
 
     session_mgr = get_or_create_session(session_id=session_id, customer_id=customer.customer_id)
 
@@ -459,14 +483,14 @@ Guidelines:
                                     elif msg_type == "START_SESSION":
                                         nonlocal customer
                                         cust_name = payload.get("customer_name") or customer.name or "there"
-                                        cust_phone = payload.get("customer_phone")
-                                        if cust_phone or payload.get("customer_name"):
+                                        cust_phone = payload.get("customer_phone") or customer.phone
+                                        if cust_phone and str(cust_phone).strip():
                                             try:
                                                 async with AsyncSessionLocal() as db_sess:
-                                                    customer = await CustomerService.get_or_create_default_customer(
+                                                    customer = await CustomerService.get_or_create_customer_by_phone(
                                                         db_sess,
-                                                        phone=cust_phone or customer.phone,
-                                                        name=cust_name,
+                                                        phone=str(cust_phone).strip(),
+                                                        name=cust_name if cust_name != "there" else None,
                                                         brand_id=active_b.id if active_b else None
                                                     )
                                                     session_mgr.customer_id = customer.customer_id

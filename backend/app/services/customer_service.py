@@ -434,13 +434,30 @@ class CustomerService:
         intent: Optional[str] = None,
         tool: Optional[str] = None,
         brand_id: Optional[str] = None
-    ) -> InteractionLog:
+    ) -> Optional[InteractionLog]:
         b_id = resolve_brand(brand_id)
-        customer = await CustomerService.get_customer_by_id(db, customer_id_str, brand_id=b_id)
+        customer = None
+        if customer_id_str and customer_id_str != "GUEST-TRANSIENT":
+            customer = await CustomerService.get_customer_by_id(db, customer_id_str, brand_id=b_id)
+            if not customer:
+                customer = await CustomerService.get_customer_by_phone(db, customer_id_str, brand_id=b_id)
         if not customer:
-            customer = await CustomerService.get_customer_by_phone(db, customer_id_str, brand_id=b_id)
+            # Fallback to most recently updated real customer in DB if one exists; never create synthetic dummy customer
+            stmt_latest = select(Customer).where(Customer.brand_id == b_id).order_by(Customer.updated_at.desc())
+            res_latest = await db.execute(stmt_latest)
+            customer = res_latest.scalars().first()
         if not customer:
-            customer = await CustomerService.get_or_create_default_customer(db, brand_id=b_id)
+            return InteractionLog(
+                id=0,
+                brand_id=b_id,
+                session_id=None,
+                customer_id=0,
+                channel=channel,
+                speaker=speaker,
+                message=message,
+                extracted_intent=intent,
+                tool_triggered=tool
+            )
         
         session_db_id = None
         if session_id_str:
@@ -516,14 +533,22 @@ class CustomerService:
             customer = await CustomerService.get_or_create_customer_by_phone(
                 db, phone=customer_phone, name=customer_name or "Valued Customer", vehicle_id=vehicle_id or "thar_roxx", brand_id=b_id
             )
-        elif customer_id_str:
+        elif customer_id_str and customer_id_str != "GUEST-TRANSIENT":
             customer = await CustomerService.get_customer_by_id(db, customer_id_str, brand_id=b_id)
             
         if not customer:
-            customer = await CustomerService.get_or_create_default_customer(db, brand_id=b_id)
-            if customer_name and customer_name.strip() and customer.name in ["Valued Customer", "Guest"]:
-                customer.name = customer_name.strip()
-                await db.commit()
+            stmt_latest = select(Customer).where(Customer.brand_id == b_id).order_by(Customer.updated_at.desc())
+            res_latest = await db.execute(stmt_latest)
+            customer = res_latest.scalars().first()
+            if not customer:
+                return ConversationSession(
+                    id=0,
+                    session_id=session_id_str,
+                    brand_id=b_id,
+                    customer_id=0,
+                    session_type="LIVE_CALL" if channel == "VOICE_LIVE" else "CHAT_BOT",
+                    vehicle_id=vehicle_id or "thar_roxx"
+                )
 
         stmt = select(ConversationSession).where(ConversationSession.session_id == session_id_str)
         res = await db.execute(stmt)

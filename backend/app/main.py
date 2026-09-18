@@ -28,9 +28,8 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             
-        # Seed default customer and dealerships & pre-warm cache
+        # Seed dealerships & pre-warm cache (do not seed synthetic customers)
         async with AsyncSessionLocal() as db:
-            await CustomerService.get_or_create_default_customer(db)
             try:
                 from seeds.seed_dealerships import seed_dealerships
                 await seed_dealerships()

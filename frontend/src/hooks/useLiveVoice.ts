@@ -113,8 +113,23 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
   const getWebSocketUrl = () => {
     if (typeof window === "undefined") return null;
+    const params = new URLSearchParams();
+    if (customerInfoRef.current.customer_id) {
+      params.set("customer_id", customerInfoRef.current.customer_id);
+    }
+    if (customerInfoRef.current.name) {
+      params.set("customer_name", customerInfoRef.current.name);
+    }
+    if (customerInfoRef.current.phone) {
+      params.set("customer_phone", customerInfoRef.current.phone);
+    }
+    if (sessionIdRef.current) {
+      params.set("session_id", sessionIdRef.current);
+    }
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
     if (process.env.NEXT_PUBLIC_WS_URL) {
-      return process.env.NEXT_PUBLIC_WS_URL;
+      return `${process.env.NEXT_PUBLIC_WS_URL}${qs}`;
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -123,11 +138,11 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
 
     // Route to backend port 8000 when frontend runs on port 3000 in dev / cloudtop
     if (port === "3000" || hostname === "localhost" || hostname === "127.0.0.1") {
-      return `${protocol}//${hostname}:8000/ws/live-audio`;
+      return `${protocol}//${hostname}:8000/ws/live-audio${qs}`;
     }
 
     // On Cloud Run container deployment, connect to the same host
-    return `${protocol}//${window.location.host}/ws/live-audio`;
+    return `${protocol}//${window.location.host}/ws/live-audio${qs}`;
   };
 
   const connectWebSocket = useCallback(() => {
@@ -367,7 +382,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
   }, []);
 
   useEffect(() => {
-    connectWebSocket();
+    setIsConnected(true);
     return () => {
       if (socketRef.current) {
         socketRef.current.onmessage = null;
@@ -380,7 +395,7 @@ export function useLiveVoice(onUiEvent?: (event: any) => void) {
         audioOutputManagerRef.current.interrupt();
       }
     };
-  }, [connectWebSocket]);
+  }, []);
 
   const sendTextMessage = async (text: string) => {
     if (!text.trim()) return;

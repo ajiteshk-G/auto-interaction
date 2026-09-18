@@ -80,22 +80,18 @@ async def list_customer_sessions(
     sessions = await CustomerService.get_customer_sessions(db, customer_id, brand_id=brand_id)
     return sessions
 
-@router.get("/profile", response_model=CustomerProfileResponse)
+@router.get("/profile", response_model=Optional[CustomerProfileResponse])
 async def get_customer_profile(
     customer_id: Optional[str] = None,
     phone: Optional[str] = None,
     brand_id: Optional[str] = Query(None, description="Active brand ID, e.g. bmw, hyundai, maruti_suzuki, mahindra"),
     db: AsyncSession = Depends(get_db)
 ):
+    customer = None
     if phone:
         customer = await CustomerService.get_customer_by_phone(db, phone, brand_id=brand_id)
-    elif customer_id:
+    elif customer_id and customer_id != "CUST-9820155432":
         customer = await CustomerService.get_customer_by_id(db, customer_id, brand_id=brand_id)
-    else:
-        customer = await CustomerService.get_or_create_default_customer(db, brand_id=brand_id)
-        
-    if not customer:
-        customer = await CustomerService.get_or_create_default_customer(db, brand_id=brand_id)
     return customer
 
 @router.patch("/profile", response_model=CustomerProfileResponse)

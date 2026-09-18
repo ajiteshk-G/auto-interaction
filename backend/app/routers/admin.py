@@ -459,3 +459,37 @@ async def get_admin_bookings(
         "count": len(filtered),
         "bookings": filtered
     }
+
+
+@router.post("/clear-database")
+@router.delete("/clear-database")
+async def clear_users_and_transcripts(db: AsyncSession = Depends(get_db)):
+    """
+    Cleans all Users, Conversation Sessions, Interaction Logs (Transcripts),
+    Test Drive Bookings, Slot Reservations, Test Ride Recordings, Outbound Call Logs,
+    and Warranty Claims from the database while preserving Dealerships, Slot Configs, and Holidays.
+    """
+    from sqlalchemy import delete
+    from app.models.customer import WarrantyClaim
+
+    for model in [
+        InteractionLog,
+        ConversationSession,
+        TestRideRecording,
+        OutboundCallLog,
+        TestDriveBooking,
+        TestDriveSlot,
+        WarrantyClaim,
+        Customer,
+    ]:
+        try:
+            await db.execute(delete(model))
+        except Exception:
+            pass
+    await db.commit()
+
+    return {
+        "status": "success",
+        "message": "Database cleaned of all users, sessions, bookings, and transcripts."
+    }
+
